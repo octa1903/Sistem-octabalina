@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+:root {
+  --br-bg: #f7f5f0;
+  --br-sur: #ffffff;
+  --br-sur2: #f0ede6;
+  --br-bor: #e2ddd4;
+  --br-txt: #1a1814;
+  --br-txt2: #7a7569;
+  --br-amb: #c47b12;
+  --br-amb-bg: #fdf3e0;
+  --br-amb-bor: #f0c060;
+  --br-red: #c0362a;
+  --br-red-bg: #fdecea;
+  --br-red-bor: #f0a099;
+  --br-grn: #2e7d4f;
+  --br-grn-bg: #e8f5ee;
+  --br-grn-bor: #90d4a8;
+  --br-dark: #1a1814;
+}
+
+body {
+  background-color: var(--br-bg);
+  color: var(--br-txt);
+  font-family: 'DM Sans', 'Inter', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+input[type='text'],
+input[type='number'],
+input[type='email'],
+input[type='password'],
+select,
+textarea {
+  font-family: inherit;
+}

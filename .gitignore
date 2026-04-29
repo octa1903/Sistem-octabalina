@@ -1,0 +1,9 @@
+# Local-only Claude Code state
+.claude/
+
+# Playwright MCP test artifacts
+.playwright-mcp/
+
+# OS
+.DS_Store
+Thumbs.db
