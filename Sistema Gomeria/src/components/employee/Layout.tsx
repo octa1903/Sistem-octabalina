@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import type { EmployeeTab } from '@/types';
+import type { EmployeeTab, CashSession } from '@/types';
 import type { useAuth } from '@/hooks/useAuth';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { Spinner } from '@/components/ui/Spinner';
 import {
   ShoppingCart, Package, Users, CreditCard,
   FileText, ClipboardList, BarChart2, Settings, LogOut,
 } from 'lucide-react';
+import { useStores } from '@/hooks/useStores';
+import { useCashSession } from '@/hooks/useCashSession';
 import { InventoryView } from './InventoryView';
 import { POSView } from './POSView';
 import { ClientsView } from './ClientsView';
@@ -14,6 +17,9 @@ import { InvoicesView } from './InvoicesView';
 import { OrdersView } from './OrdersView';
 import { AnalyticsView } from './AnalyticsView';
 import { SettingsView } from './SettingsView';
+import { TopBar } from './TopBar';
+import { OpenCashModal } from './cash/OpenCashModal';
+import { CloseCashModal } from './cash/CloseCashModal';
 
 type AuthReturn = ReturnType<typeof useAuth>;
 interface Props { auth: AuthReturn; }
@@ -31,7 +37,35 @@ const NAV_ITEMS: { id: EmployeeTab; label: string; Icon: React.ElementType }[] =
 
 export function EmployeeApp({ auth }: Props) {
   const [tab, setTab] = useState<EmployeeTab>('pos');
+  const [openCashOpen, setOpenCashOpen] = useState(false);
+  const [closingSession, setClosingSession] = useState<CashSession | null>(null);
   const { toasts, addToast, removeToast } = useToast();
+
+  const stores = useStores(auth.isAuthenticated);
+  const cash = useCashSession(stores.activeStoreId, auth.employeeId ?? null);
+
+  const activeStoreName = stores.activeStore?.name ?? 'Sin tienda';
+
+  async function handleOpenCash(amount: number) {
+    try {
+      await cash.open(amount);
+      addToast(`Caja abierta con ${amount.toLocaleString('es-AR')}`, 'success');
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error abriendo caja', 'error');
+      throw e;
+    }
+  }
+
+  async function handleCloseCash(amount: number) {
+    const r = await cash.close(amount);
+    addToast(
+      r.variance === 0
+        ? 'Caja cerrada sin descuadre'
+        : `Caja cerrada con descuadre ${r.variance > 0 ? '+' : ''}${r.variance.toLocaleString('es-AR')}`,
+      r.variance === 0 ? 'success' : 'warning',
+    );
+    return r;
+  }
 
   return (
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--br-bg)' }}>
@@ -50,7 +84,7 @@ export function EmployeeApp({ auth }: Props) {
           </div>
           <div className="hidden lg:block overflow-hidden">
             <p className="text-sm font-semibold text-white truncate leading-tight">Baliña Ruedas</p>
-            <p className="text-xs truncate" style={{ color: '#9a9590' }}>Empleado</p>
+            <p className="text-xs truncate" style={{ color: '#9a9590' }}>{auth.employeeName ?? 'Empleado'}</p>
           </div>
         </div>
 
@@ -88,17 +122,68 @@ export function EmployeeApp({ auth }: Props) {
         </div>
       </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-y-auto">
-        {tab === 'pos'       && <POSView       addToast={addToast} />}
-        {tab === 'inventory' && <InventoryView addToast={addToast} />}
-        {tab === 'clients'   && <ClientsView   addToast={addToast} />}
-        {tab === 'accounts'  && <AccountsView  addToast={addToast} />}
-        {tab === 'invoices'  && <InvoicesView  addToast={addToast} />}
-        {tab === 'orders'    && <OrdersView    addToast={addToast} />}
-        {tab === 'analytics' && <AnalyticsView />}
-        {tab === 'settings'  && <SettingsView  auth={auth} addToast={addToast} />}
-      </main>
+      {/* Main column */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopBar
+          stores={stores.stores}
+          activeStoreId={stores.activeStoreId}
+          onSelectStore={stores.selectStore}
+          session={cash.session}
+          cashLoading={cash.loading || stores.loading}
+          onOpenCash={() => setOpenCashOpen(true)}
+          onCloseCash={() => { if (cash.session) setClosingSession(cash.session); }}
+          employeeName={auth.employeeName}
+        />
+
+        <main className="flex-1 overflow-y-auto">
+          {stores.loading ? (
+            <div className="flex h-full items-center justify-center">
+              <Spinner />
+            </div>
+          ) : !stores.activeStoreId ? (
+            <div className="flex h-full items-center justify-center p-8">
+              <div className="text-center max-w-sm">
+                <p className="text-lg font-semibold mb-2" style={{ color: 'var(--br-txt)' }}>
+                  {stores.stores.length === 0 ? 'No hay tiendas disponibles' : 'Seleccioná una tienda'}
+                </p>
+                <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
+                  {stores.stores.length === 0
+                    ? 'Pedí al admin que cree una tienda activa.'
+                    : 'Elegí una tienda en la barra superior para continuar.'}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {tab === 'pos'       && <POSView       addToast={addToast} />}
+              {tab === 'inventory' && <InventoryView addToast={addToast} activeStoreId={stores.activeStoreId} />}
+              {tab === 'clients'   && <ClientsView   addToast={addToast} />}
+              {tab === 'accounts'  && <AccountsView  addToast={addToast} />}
+              {tab === 'invoices'  && <InvoicesView  addToast={addToast} />}
+              {tab === 'orders'    && <OrdersView    addToast={addToast} />}
+              {tab === 'analytics' && <AnalyticsView />}
+              {tab === 'settings'  && <SettingsView  auth={auth} addToast={addToast} />}
+            </>
+          )}
+        </main>
+      </div>
+
+      {/* Cash modals */}
+      <OpenCashModal
+        open={openCashOpen}
+        storeName={activeStoreName}
+        onClose={() => setOpenCashOpen(false)}
+        onConfirm={handleOpenCash}
+      />
+      {closingSession && (
+        <CloseCashModal
+          open={true}
+          session={closingSession}
+          storeName={activeStoreName}
+          onClose={() => setClosingSession(null)}
+          onConfirm={handleCloseCash}
+        />
+      )}
 
       {/* Toasts */}
       {toasts.map((t) => (
