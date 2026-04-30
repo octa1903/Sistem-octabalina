@@ -155,7 +155,7 @@ export function EmployeeApp({ auth }: Props) {
             </div>
           ) : (
             <>
-              {tab === 'pos'       && <POSView       addToast={addToast} />}
+              {tab === 'pos'       && <POSView       addToast={addToast} storeId={stores.activeStoreId} cashSession={cash.session} employeeId={auth.employeeId ?? null} />}
               {tab === 'inventory' && <InventoryView addToast={addToast} activeStoreId={stores.activeStoreId} />}
               {tab === 'clients'   && <ClientsView   addToast={addToast} />}
               {tab === 'accounts'  && <AccountsView  addToast={addToast} />}
