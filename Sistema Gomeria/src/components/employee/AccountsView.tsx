@@ -1,65 +1,141 @@
-import { useState, useMemo } from 'react';
-import type { Client, Payment } from '@/types';
-import { clientService } from '@/services/storageService';
-import { PAYMENT_METHODS } from '@/constants';
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import type { Customer, CustomerAccountMovement, PaymentMethod } from '@/types';
+import { customerServiceV2 } from '@/services/customerServiceV2';
+import { supabase } from '@/services/supabaseClient';
+import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
 import { Search, Plus, Minus, TrendingUp, TrendingDown } from 'lucide-react';
 
-interface Props { addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void; }
+interface Props {
+  addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
+  employeeId: string | null;
+}
 
-export function AccountsView({ addToast }: Props) {
-  const [clients, setClients] = useState<Client[]>(() => clientService.getAll());
+export function AccountsView({ addToast, employeeId }: Props) {
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<Client | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [movements, setMovements] = useState<CustomerAccountMovement[]>([]);
+  const [movementsLoading, setMovementsLoading] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [paymentType, setPaymentType] = useState<'charge' | 'payment'>('charge');
   const [amount, setAmount] = useState('');
-  const [method, setMethod] = useState('efectivo');
+  const [paymentMethodId, setPaymentMethodId] = useState('');
   const [notes, setNotes] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [custs, pms] = await Promise.all([
+        customerServiceV2.getAll(),
+        supabase
+          .from('payment_methods')
+          .select('*')
+          .order('sort_order', { ascending: true })
+          .then(r => ensureNoError(r.data, r.error, 'AccountsView.pm').map(row => rowToCamel<PaymentMethod>(row))),
+      ]);
+      setCustomers(custs);
+      setPaymentMethods(pms);
+      if (!paymentMethodId) {
+        const cash = pms.find(p => p.type === 'cash');
+        if (cash) setPaymentMethodId(cash.id);
+        else if (pms.length > 0) setPaymentMethodId(pms[0].id);
+      }
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error cargando cuentas.', 'error');
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addToast]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const loadMovements = useCallback(async (customerId: string) => {
+    setMovementsLoading(true);
+    try {
+      const data = await customerServiceV2.getMovements(customerId);
+      setMovements(data);
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error cargando movimientos.', 'error');
+    } finally {
+      setMovementsLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => {
+    if (selectedId) {
+      void loadMovements(selectedId);
+    } else {
+      setMovements([]);
+    }
+  }, [selectedId, loadMovements]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return clients.filter((c) => c.name.toLowerCase().includes(q) || c.phone?.includes(q));
-  }, [clients, search]);
+    return customers.filter(c =>
+      c.name.toLowerCase().includes(q) || (c.phone ?? '').includes(q),
+    );
+  }, [customers, search]);
 
-  const totalDebt = clients.reduce((s, c) => s + Math.max(0, c.balance), 0);
+  const selected = customers.find(c => c.id === selectedId) ?? null;
+  const totalDebt = customers.reduce((s, c) => s + Math.max(0, c.accountBalance), 0);
 
-  function openPayment(c: Client, type: 'charge' | 'payment') {
-    setSelected(c);
+  function openPayment(type: 'charge' | 'payment') {
+    if (!selected) return;
     setPaymentType(type);
     setAmount('');
-    setMethod('efectivo');
     setNotes('');
     setPaymentOpen(true);
   }
 
-  function savePayment() {
-    if (!selected || !amount || Number(amount) <= 0) {
-      addToast('Ingrese un monto válido.', 'error');
+  async function savePayment() {
+    if (!selected) return;
+    const num = Number(amount);
+    if (!amount || num <= 0) {
+      addToast('Ingresá un monto válido (>0).', 'error');
       return;
     }
-    const now = new Date().toISOString();
-    const delta = paymentType === 'charge' ? Number(amount) : -Number(amount);
-    const payment: Payment = {
-      id: `p${Date.now()}`,
-      amount: Number(amount),
-      date: now,
-      method: PAYMENT_METHODS.find((p) => p.id === method)?.label ?? method,
-      notes,
-    };
-    const updated: Client = {
-      ...selected,
-      balance: selected.balance + delta,
-      payments: [...selected.payments, payment],
-      updatedAt: now,
-    };
-    clientService.save(updated);
-    setClients(clientService.getAll());
-    setSelected(updated);
-    setPaymentOpen(false);
-    addToast(paymentType === 'charge' ? 'Cargo registrado.' : 'Pago registrado.', 'success');
+    if (!paymentMethodId) {
+      addToast('Seleccioná un método de pago.', 'error');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      // Insertar movimiento
+      await customerServiceV2.addMovement({
+        customerId: selected.id,
+        type: paymentType,
+        amount: num,
+        paymentMethodId,
+        notes: notes || undefined,
+        employeeId: employeeId ?? undefined,
+      });
+      // Actualizar balance: charge suma, payment resta
+      const delta = paymentType === 'charge' ? num : -num;
+      await customerServiceV2.save({
+        id: selected.id,
+        name: selected.name,
+        accountBalance: selected.accountBalance + delta,
+      });
+      await refresh();
+      await loadMovements(selected.id);
+      setPaymentOpen(false);
+      addToast(paymentType === 'charge' ? 'Cargo registrado.' : 'Pago registrado.', 'success');
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error guardando movimiento.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   }
+
+  const pmName = (id?: string) => paymentMethods.find(p => p.id === id)?.name ?? 'Sin método';
 
   return (
     <div className="p-5 max-w-6xl mx-auto">
@@ -73,38 +149,55 @@ export function AccountsView({ addToast }: Props) {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
-        {/* Client list */}
+        {/* Customer list */}
         <div className="lg:col-span-1">
           <div className="relative mb-3">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--br-txt2)' }} />
-            <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar cliente..."
               className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }} />
+              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }}
+            />
           </div>
           <div className="space-y-2">
-            {filtered.map((c) => (
-              <button key={c.id} onClick={() => setSelected(c)}
-                className="w-full text-left rounded-xl p-3 transition-all"
-                style={{
-                  background: selected?.id === c.id ? 'var(--br-amb-bg)' : 'var(--br-sur)',
-                  border: `1px solid ${selected?.id === c.id ? 'var(--br-amb-bor)' : 'var(--br-bor)'}`,
-                }}>
-                <p className="font-medium text-sm" style={{ color: 'var(--br-txt)' }}>{c.name}</p>
-                <p className="text-sm font-mono font-semibold mt-0.5"
-                  style={{ color: c.balance > 0 ? 'var(--br-red)' : c.balance < 0 ? 'var(--br-grn)' : 'var(--br-txt2)' }}>
-                  {c.balance !== 0 ? (c.balance > 0 ? 'Debe ' : 'Favor ') : ''}{formatCurrency(Math.abs(c.balance))}
-                </p>
-              </button>
-            ))}
-            {filtered.length === 0 && <p className="text-sm text-center py-6" style={{ color: 'var(--br-txt2)' }}>Sin clientes.</p>}
+            {loading ? (
+              <p className="text-sm text-center py-6" style={{ color: 'var(--br-txt2)' }}>Cargando...</p>
+            ) : filtered.length === 0 ? (
+              <p className="text-sm text-center py-6" style={{ color: 'var(--br-txt2)' }}>
+                {customers.length === 0 ? 'No hay clientes registrados.' : 'Sin resultados.'}
+              </p>
+            ) : (
+              filtered.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedId(c.id)}
+                  className="w-full text-left rounded-xl p-3 transition-all"
+                  style={{
+                    background: selectedId === c.id ? 'var(--br-amb-bg)' : 'var(--br-sur)',
+                    border: `1px solid ${selectedId === c.id ? 'var(--br-amb-bor)' : 'var(--br-bor)'}`,
+                  }}
+                >
+                  <p className="font-medium text-sm" style={{ color: 'var(--br-txt)' }}>{c.name}</p>
+                  <p
+                    className="text-sm font-mono font-semibold mt-0.5"
+                    style={{ color: c.accountBalance > 0 ? 'var(--br-red)' : c.accountBalance < 0 ? 'var(--br-grn)' : 'var(--br-txt2)' }}
+                  >
+                    {c.accountBalance !== 0 ? (c.accountBalance > 0 ? 'Debe ' : 'Favor ') : ''}
+                    {formatCurrency(Math.abs(c.accountBalance))}
+                  </p>
+                </button>
+              ))
+            )}
           </div>
         </div>
 
         {/* Account detail */}
         <div className="lg:col-span-2">
           {!selected ? (
-            <div className="h-full flex items-center justify-center rounded-xl" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
+            <div className="h-full flex items-center justify-center rounded-xl py-20" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
               <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>Seleccioná un cliente para ver su cuenta.</p>
             </div>
           ) : (
@@ -112,60 +205,78 @@ export function AccountsView({ addToast }: Props) {
               <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--br-bor)' }}>
                 <div>
                   <h2 className="font-semibold" style={{ color: 'var(--br-txt)' }}>{selected.name}</h2>
-                  <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>{selected.tipoCliente}</p>
+                  <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
+                    {selected.customerType === 'wholesale' ? 'Mayorista' : 'Minorista'}
+                  </p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => openPayment(selected, 'charge')}
+                  <button
+                    onClick={() => openPayment('charge')}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white"
-                    style={{ background: 'var(--br-red)' }}>
+                    style={{ background: 'var(--br-red)' }}
+                  >
                     <Plus className="h-4 w-4" /> Cargo
                   </button>
-                  <button onClick={() => openPayment(selected, 'payment')}
+                  <button
+                    onClick={() => openPayment('payment')}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium text-white"
-                    style={{ background: 'var(--br-grn)' }}>
+                    style={{ background: 'var(--br-grn)' }}
+                  >
                     <Minus className="h-4 w-4" /> Pago
                   </button>
                 </div>
               </div>
 
-              {/* Balance */}
               <div className="px-5 py-4" style={{ background: 'var(--br-sur2)', borderBottom: '1px solid var(--br-bor)' }}>
                 <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Saldo actual</p>
-                <p className="text-3xl font-bold font-mono" style={{ color: selected.balance > 0 ? 'var(--br-red)' : selected.balance < 0 ? 'var(--br-grn)' : 'var(--br-txt)' }}>
-                  {formatCurrency(Math.abs(selected.balance))}
+                <p
+                  className="text-3xl font-bold font-mono"
+                  style={{ color: selected.accountBalance > 0 ? 'var(--br-red)' : selected.accountBalance < 0 ? 'var(--br-grn)' : 'var(--br-txt)' }}
+                >
+                  {formatCurrency(Math.abs(selected.accountBalance))}
                 </p>
                 <p className="text-sm mt-0.5" style={{ color: 'var(--br-txt2)' }}>
-                  {selected.balance > 0 ? 'Saldo deudor' : selected.balance < 0 ? 'Saldo a favor' : 'Sin saldo'}
+                  {selected.accountBalance > 0 ? 'Saldo deudor' : selected.accountBalance < 0 ? 'Saldo a favor' : 'Sin saldo'}
+                  {selected.creditLimit > 0 && (
+                    <span> · Cupo: <span className="font-mono">{formatCurrency(selected.creditLimit)}</span></span>
+                  )}
                 </p>
               </div>
 
-              {/* Payment history */}
               <div className="px-5 py-4">
                 <p className="text-sm font-semibold mb-3" style={{ color: 'var(--br-txt)' }}>Movimientos</p>
-                {selected.payments.length === 0 ? (
+                {movementsLoading ? (
+                  <p className="text-sm py-4 text-center" style={{ color: 'var(--br-txt2)' }}>Cargando...</p>
+                ) : movements.length === 0 ? (
                   <p className="text-sm py-4 text-center" style={{ color: 'var(--br-txt2)' }}>Sin movimientos registrados.</p>
                 ) : (
                   <div className="space-y-2">
-                    {[...selected.payments].reverse().map((p) => (
-                      <div key={p.id} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-                        <div className="flex items-center gap-2">
-                          {p.amount > 0
-                            ? <TrendingDown className="h-4 w-4" style={{ color: 'var(--br-grn)' }} />
-                            : <TrendingUp className="h-4 w-4" style={{ color: 'var(--br-red)' }} />
-                          }
-                          <div>
-                            <p className="text-sm font-medium" style={{ color: 'var(--br-txt)' }}>{p.method}</p>
-                            <p className="text-xs" style={{ color: 'var(--br-txt2)' }}>
-                              {new Date(p.date).toLocaleDateString('es-AR')}
-                              {p.notes && ` · ${p.notes}`}
-                            </p>
+                    {movements.map((m) => {
+                      const isCharge = m.type === 'charge';
+                      return (
+                        <div key={m.id} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--br-bor)' }}>
+                          <div className="flex items-center gap-2">
+                            {isCharge
+                              ? <TrendingUp className="h-4 w-4" style={{ color: 'var(--br-red)' }} />
+                              : <TrendingDown className="h-4 w-4" style={{ color: 'var(--br-grn)' }} />
+                            }
+                            <div>
+                              <p className="text-sm font-medium" style={{ color: 'var(--br-txt)' }}>
+                                {isCharge ? 'Cargo' : 'Pago'} · {pmName(m.paymentMethodId)}
+                              </p>
+                              <p className="text-xs" style={{ color: 'var(--br-txt2)' }}>
+                                {new Date(m.at).toLocaleDateString('es-AR')}
+                                {m.notes && ` · ${m.notes}`}
+                              </p>
+                            </div>
                           </div>
+                          <span className="font-mono text-sm font-semibold"
+                                style={{ color: isCharge ? 'var(--br-red)' : 'var(--br-grn)' }}>
+                            {isCharge ? '+' : '−'}{formatCurrency(m.amount)}
+                          </span>
                         </div>
-                        <span className="font-mono text-sm font-semibold" style={{ color: 'var(--br-grn)' }}>
-                          {formatCurrency(p.amount)}
-                        </span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -174,39 +285,39 @@ export function AccountsView({ addToast }: Props) {
         </div>
       </div>
 
-      {/* Payment modal */}
-      <Modal open={paymentOpen} onClose={() => setPaymentOpen(false)} title={paymentType === 'charge' ? 'Registrar cargo' : 'Registrar pago'} size="sm">
+      <Modal open={paymentOpen} onClose={() => !submitting && setPaymentOpen(false)} title={paymentType === 'charge' ? 'Registrar cargo' : 'Registrar pago'} size="sm">
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Monto ($)</label>
             <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)}
               placeholder="0" autoFocus
+              disabled={submitting}
               className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-              onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-              onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')} />
+              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Método</label>
-            <select value={method} onChange={(e) => setMethod(e.target.value)}
+            <select value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)}
+              disabled={submitting}
               className="w-full px-3 py-2 rounded-lg text-sm outline-none"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
-              {PAYMENT_METHODS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              {paymentMethods.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Notas</label>
             <input type="text" value={notes} onChange={(e) => setNotes(e.target.value)}
               placeholder="Opcional..."
+              disabled={submitting}
               className="w-full px-3 py-2 rounded-lg text-sm outline-none"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setPaymentOpen(false)} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={savePayment} className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
+          <button onClick={() => setPaymentOpen(false)} disabled={submitting} className="px-4 py-2 rounded-lg text-sm disabled:opacity-50" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
+          <button onClick={savePayment} disabled={submitting} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
             style={{ background: paymentType === 'charge' ? 'var(--br-red)' : 'var(--br-grn)' }}>
-            {paymentType === 'charge' ? 'Registrar cargo' : 'Registrar pago'}
+            {submitting ? 'Guardando...' : paymentType === 'charge' ? 'Registrar cargo' : 'Registrar pago'}
           </button>
         </div>
       </Modal>
