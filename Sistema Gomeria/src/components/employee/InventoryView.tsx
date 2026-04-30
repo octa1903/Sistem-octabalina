@@ -5,7 +5,8 @@ import { tireServiceV2 } from '@/services/tireServiceV2';
 import { categoryService } from '@/services/categoryService';
 import { formatCurrency, calculateSalePrice } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, AlertTriangle } from 'lucide-react';
+import { ImportModal } from '@/components/employee/import/ImportModal';
+import { Plus, Search, Edit2, Trash2, AlertTriangle, Upload } from 'lucide-react';
 
 interface Props {
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
@@ -57,6 +58,7 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM });
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<Tire | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!activeStoreId) return;
@@ -238,14 +240,24 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
             {lowCount > 0 && <span style={{ color: 'var(--br-red)' }}> · {lowCount} con stock bajo</span>}
           </p>
         </div>
-        <button
-          onClick={openNew}
-          disabled={loading || categories.length === 0}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-50"
-          style={{ background: 'var(--br-amb)' }}
-        >
-          <Plus className="h-4 w-4" /> Nuevo neumático
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setImportOpen(true)}
+            disabled={loading || categories.length === 0}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
+            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}
+          >
+            <Upload className="h-4 w-4" /> Importar
+          </button>
+          <button
+            onClick={openNew}
+            disabled={loading || categories.length === 0}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-50"
+            style={{ background: 'var(--br-amb)' }}
+          >
+            <Plus className="h-4 w-4" /> Nuevo neumático
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -434,6 +446,19 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
           </div>
         </div>
       </Modal>
+
+      {/* Import modal */}
+      <ImportModal
+        open={importOpen}
+        kind="tires"
+        storeId={activeStoreId}
+        categories={categories}
+        onClose={() => setImportOpen(false)}
+        onComplete={(s) => {
+          addToast(`${s.inserted} neumáticos importados${s.failed > 0 ? `, ${s.failed} con errores` : ''}.`, s.failed > 0 ? 'warning' : 'success');
+          void refresh();
+        }}
+      />
 
       {/* Delete confirm */}
       <Modal open={!!deleting} onClose={() => setDeleting(null)} title="Confirmar eliminación" size="sm">

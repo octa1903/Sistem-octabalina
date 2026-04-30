@@ -6,7 +6,8 @@ import { DEFAULT_PIN_HASH } from '@/constants';
 import { formatCurrency } from '@/utils/currency';
 import { sha256 } from '@/utils/hash';
 import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, User, Phone, MapPin } from 'lucide-react';
+import { ImportModal } from '@/components/employee/import/ImportModal';
+import { Plus, Search, Edit2, Trash2, User, Phone, MapPin, Upload } from 'lucide-react';
 
 interface Props { addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void; }
 
@@ -32,6 +33,7 @@ function unmirrorFromLegacy(id: string) {
 export function ClientsView({ addToast }: Props) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importOpen, setImportOpen] = useState(false);
 
   async function refresh() {
     try {
@@ -172,9 +174,18 @@ export function ClientsView({ addToast }: Props) {
           <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Clientes</h1>
           <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>{clients.length} clientes registrados</p>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-semibold" style={{ background: 'var(--br-amb)' }}>
-          <Plus className="h-4 w-4" /> Nuevo cliente
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setImportOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold"
+            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}
+          >
+            <Upload className="h-4 w-4" /> Importar
+          </button>
+          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-semibold" style={{ background: 'var(--br-amb)' }}>
+            <Plus className="h-4 w-4" /> Nuevo cliente
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
@@ -244,6 +255,17 @@ export function ClientsView({ addToast }: Props) {
           </p>
         )}
       </div>
+
+      {/* Import modal */}
+      <ImportModal
+        open={importOpen}
+        kind="customers"
+        onClose={() => setImportOpen(false)}
+        onComplete={(s) => {
+          addToast(`${s.inserted} clientes importados${s.failed > 0 ? `, ${s.failed} con errores` : ''}.`, s.failed > 0 ? 'warning' : 'success');
+          void refresh();
+        }}
+      />
 
       {/* Form modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar cliente' : 'Nuevo cliente'} size="md">
