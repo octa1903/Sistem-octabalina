@@ -17,7 +17,7 @@ import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
 import { printReceipt } from '@/utils/printReceipt';
 import { Modal } from '@/components/ui/Modal';
-import { Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle, Lock, Printer } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle, Lock, Printer, Bookmark, Inbox } from 'lucide-react';
 
 interface Props {
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
@@ -79,10 +79,28 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
   const [lastReceipt, setLastReceipt] = useState<{ number: string; total: number; pmName: string } | null>(null);
   const [lastReceiptData, setLastReceiptData] = useState<LastReceiptData | null>(null);
 
+  // Tickets abiertos (parked)
+  const [parkedTickets, setParkedTickets] = useState<Receipt[]>([]);
+  const [parkOpen, setParkOpen] = useState(false);
+  const [parkName, setParkName] = useState('');
+  const [parking, setParking] = useState(false);
+  const [parkedListOpen, setParkedListOpen] = useState(false);
+  const [resumingParkedId, setResumingParkedId] = useState<string | null>(null);
+  const [employeeNameById, setEmployeeNameById] = useState<Map<string, string>>(new Map());
+
+  const reloadParked = useCallback(async () => {
+    try {
+      const list = await receiptService.getParked(storeId);
+      setParkedTickets(list);
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error cargando tickets abiertos.', 'error');
+    }
+  }, [storeId, addToast]);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [tiresV2, cats, custs, ovr, pms, taxesData, storeData, rConfig, { data: loyaltyData }] = await Promise.all([
+      const [tiresV2, cats, custs, ovr, pms, taxesData, storeData, rConfig, { data: loyaltyData }, parked, empsRes] = await Promise.all([
         tireServiceV2.getAll(),
         categoryService.getAll(),
         customerServiceV2.getAll(),
@@ -94,7 +112,13 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         storeService.getById(storeId),
         receiptConfigService.getByStore(storeId).catch(() => null),
         supabase.from('loyalty_config').select('*').maybeSingle(),
+        receiptService.getParked(storeId),
+        supabase.from('employees').select('id, name'),
       ]);
+      setParkedTickets(parked);
+      const empMap = new Map<string, string>();
+      (empsRes.data ?? []).forEach((e: { id: string; name: string }) => empMap.set(e.id, e.name));
+      setEmployeeNameById(empMap);
       const m = new Map<string, TireStoreOverride>();
       ovr.forEach(o => m.set(o.tireId, o));
       setTires(tiresV2);
@@ -331,6 +355,18 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
       setSuccessOpen(true);
       addToast(`Venta ${receipt.receiptNumber} registrada.`, 'success');
 
+      // Si estábamos reanudando un ticket abierto, eliminarlo ahora.
+      if (resumingParkedId) {
+        try {
+          await receiptService.deleteParked(resumingParkedId);
+        } catch {
+          // Si falla la eliminación del parked, no rompemos el flujo;
+          // el listado se recargará con reloadParked() y el usuario puede borrarlo.
+        }
+        setResumingParkedId(null);
+        await reloadParked();
+      }
+
       // Recargar overrides para reflejar stock actualizado
       const newOverrides = await tireServiceV2.getOverridesByStore(storeId);
       const m = new Map<string, TireStoreOverride>();
@@ -340,6 +376,133 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
       addToast(e instanceof Error ? e.message : 'Error registrando venta.', 'error');
     } finally {
       setConfirming(false);
+    }
+  }
+
+  function openPark() {
+    if (cart.length === 0) {
+      addToast('El carrito está vacío.', 'warning');
+      return;
+    }
+    if (!cashSession) {
+      addToast('Tenés que abrir la caja primero.', 'warning');
+      return;
+    }
+    setParkName(selectedCustomer?.name ?? '');
+    setParkOpen(true);
+  }
+
+  async function confirmPark() {
+    if (!cashSession || !employeeId) return;
+    const name = parkName.trim();
+    if (!name) {
+      addToast('Poné un nombre para identificar el ticket.', 'warning');
+      return;
+    }
+    setParking(true);
+    try {
+      const input: BuildReceiptInput = {
+        storeId,
+        cashSessionId: cashSession.id,
+        employeeId,
+        customerId: customerId || undefined,
+        cart: cart.map(ci => ({ tireId: ci.tire.id, quantity: ci.quantity, modifiers: [] })),
+        ticketDiscountIds: [],
+        paymentSplits: [],
+        type: 'sale',
+        parkedName: name,
+      };
+      const tireById = new Map(tires.map(t => [t.id, t]));
+      const overrideById = overridesByTire;
+      const categoryById = new Map(categories.map(c => [c.id, c]));
+      const pmById = new Map(paymentMethods.map(p => [p.id, p]));
+      await receiptService.buildAndSave(input, {
+        getTire: id => tireById.get(id),
+        getOverride: (tireId, sId) => sId === storeId ? overrideById.get(tireId) : undefined,
+        getCategory: id => categoryById.get(id),
+        getTax: id => taxesById.get(id),
+        getDiscount: () => undefined,
+        getPaymentMethod: id => pmById.get(id),
+        loyalty,
+        nextReceiptNumber,
+      });
+
+      // Si estábamos reanudando otro ticket, lo borramos para no duplicar.
+      if (resumingParkedId) {
+        try { await receiptService.deleteParked(resumingParkedId); } catch { /* noop */ }
+        setResumingParkedId(null);
+      }
+
+      setCart([]);
+      setCustomerId('');
+      setParkOpen(false);
+      setParkName('');
+      addToast(`Ticket "${name}" guardado.`, 'success');
+      await reloadParked();
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error guardando ticket.', 'error');
+    } finally {
+      setParking(false);
+    }
+  }
+
+  async function resumeParked(receipt: Receipt) {
+    try {
+      const lines = await receiptService.getLines(receipt.id);
+      const newCart: CartItem[] = [];
+      const skipped: string[] = [];
+      for (const line of lines) {
+        const tire = tires.find(t => t.id === line.tireId);
+        const override = overridesByTire.get(line.tireId);
+        if (!tire) {
+          skipped.push(`${line.tireBrand} ${line.tireSize}`);
+          continue;
+        }
+        const stock = override?.stock ?? 0;
+        const qty = Math.min(line.quantity, stock);
+        if (qty <= 0) {
+          skipped.push(`${line.tireBrand} ${line.tireSize} (sin stock)`);
+          continue;
+        }
+        newCart.push({
+          tire,
+          override,
+          unitPrice: line.unitPrice,
+          unitCost: line.unitCost,
+          stock,
+          quantity: qty,
+          subtotal: qty * line.unitPrice,
+        });
+        if (qty < line.quantity) {
+          skipped.push(`${line.tireBrand} ${line.tireSize} ajustado a ${qty} u.`);
+        }
+      }
+      if (newCart.length === 0) {
+        addToast('No se pudo reanudar: sin items disponibles.', 'error');
+        return;
+      }
+      setCart(newCart);
+      setCustomerId(receipt.customerId ?? '');
+      setResumingParkedId(receipt.id);
+      setParkedListOpen(false);
+      if (skipped.length > 0) {
+        addToast(`Reanudado con ajustes: ${skipped.join(', ')}.`, 'warning');
+      } else {
+        addToast(`Ticket "${receipt.parkedName ?? receipt.receiptNumber}" reanudado.`, 'success');
+      }
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error reanudando ticket.', 'error');
+    }
+  }
+
+  async function deleteParked(id: string) {
+    try {
+      await receiptService.deleteParked(id);
+      if (resumingParkedId === id) setResumingParkedId(null);
+      await reloadParked();
+      addToast('Ticket eliminado.', 'success');
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error eliminando ticket.', 'error');
     }
   }
 
@@ -530,6 +693,42 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
           >
             Cobrar {formatCurrency(total)}
           </button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={openPark}
+              disabled={cart.length === 0 || !cashSession}
+              className="py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
+              style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}
+              title="Guardar ticket abierto (sin cobrar)"
+            >
+              <Bookmark className="h-3.5 w-3.5" />
+              Guardar ticket
+            </button>
+            <button
+              onClick={() => setParkedListOpen(true)}
+              className="py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 relative"
+              style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}
+              title="Ver tickets abiertos"
+            >
+              <Inbox className="h-3.5 w-3.5" />
+              Tickets abiertos
+              {parkedTickets.length > 0 && (
+                <span
+                  className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                  style={{ background: 'var(--br-amb)', color: 'white' }}
+                >
+                  {parkedTickets.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {resumingParkedId && (
+            <p className="text-[11px] text-center" style={{ color: 'var(--br-amb)' }}>
+              Reanudando ticket abierto · al cobrar se elimina
+            </p>
+          )}
         </div>
       </div>
 
@@ -601,6 +800,110 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
           </button>
           <button onClick={() => setSuccessOpen(false)} className="px-6 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-dark)' }}>
             Continuar
+          </button>
+        </div>
+      </Modal>
+
+      {/* Guardar ticket (park) */}
+      <Modal open={parkOpen} onClose={() => !parking && setParkOpen(false)} title="Guardar ticket abierto" size="sm">
+        <div className="space-y-3">
+          <p className="text-xs" style={{ color: 'var(--br-txt2)' }}>
+            El ticket queda en espera. No descuenta stock ni registra pagos hasta que lo reanudes y cobres.
+          </p>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
+              Nombre / Referencia
+            </label>
+            <input
+              type="text"
+              value={parkName}
+              onChange={(e) => setParkName(e.target.value)}
+              placeholder="Ej: Camioneta blanca, Juan Pérez..."
+              autoFocus
+              maxLength={60}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+              onKeyDown={(e) => { if (e.key === 'Enter') void confirmPark(); }}
+            />
+          </div>
+          <div className="flex justify-between text-sm pt-2" style={{ borderTop: '1px solid var(--br-bor)' }}>
+            <span style={{ color: 'var(--br-txt2)' }}>{cart.length} item(s)</span>
+            <span className="font-mono font-semibold" style={{ color: 'var(--br-amb)' }}>{formatCurrency(subtotal)}</span>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <button onClick={() => setParkOpen(false)} disabled={parking} className="px-4 py-2 rounded-lg text-sm disabled:opacity-50" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>
+            Cancelar
+          </button>
+          <button onClick={confirmPark} disabled={parking || !parkName.trim()} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
+            {parking ? 'Guardando...' : 'Guardar'}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Lista de tickets abiertos */}
+      <Modal open={parkedListOpen} onClose={() => setParkedListOpen(false)} title="Tickets abiertos" size="md">
+        {parkedTickets.length === 0 ? (
+          <p className="text-sm py-8 text-center" style={{ color: 'var(--br-txt2)' }}>
+            No hay tickets abiertos en esta tienda.
+          </p>
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {parkedTickets.map(p => {
+              const cust = customers.find(c => c.id === p.customerId);
+              const empName = employeeNameById.get(p.employeeId);
+              return (
+                <div
+                  key={p.id}
+                  className="rounded-lg p-3 flex items-center justify-between gap-3"
+                  style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)' }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--br-txt)' }}>
+                      {p.parkedName ?? p.receiptNumber}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--br-txt2)' }}>
+                      {new Date(p.createdAt).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}
+                      {empName ? ` · ${empName}` : ''}
+                      {cust ? ` · ${cust.name}` : ''}
+                    </p>
+                    <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--br-amb)' }}>
+                      {formatCurrency(p.total)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => void resumeParked(p)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                      style={{ background: 'var(--br-grn)' }}
+                    >
+                      Reanudar
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm(`¿Eliminar ticket "${p.parkedName ?? p.receiptNumber}"?`)) {
+                          void deleteParked(p.id);
+                        }
+                      }}
+                      className="p-1.5 rounded-lg"
+                      style={{ color: 'var(--br-red)', border: '1px solid var(--br-bor)' }}
+                      title="Eliminar"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <div className="flex justify-end mt-4">
+          <button
+            onClick={() => setParkedListOpen(false)}
+            className="px-4 py-2 rounded-lg text-sm"
+            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}
+          >
+            Cerrar
           </button>
         </div>
       </Modal>

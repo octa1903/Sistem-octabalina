@@ -95,6 +95,16 @@ export const receiptService = {
     return ensureNoError(data, error, 'receiptService.getParked').map(r => rowToCamel<Receipt>(r));
   },
 
+  /** Borra un ticket abierto (solo si status='parked', enforced por RLS). */
+  async deleteParked(id: string): Promise<void> {
+    const { error } = await supabase
+      .from(TABLE)
+      .delete()
+      .eq('id', id)
+      .eq('status', 'parked');
+    if (error) throw error;
+  },
+
   // ── Construcción y persistencia ───────────────────
 
   /**
@@ -138,12 +148,20 @@ export const receiptService = {
     const totalRaw = sumLineTotals - sum(ticketDiscounts.map(d => d.amount)) + pmSurcharge;
     const total = input.type === 'refund' ? -Math.abs(totalRaw) : totalRaw;
 
-    // Validaciones
-    const paymentsTotal = sum(input.paymentSplits.map(p => p.amount));
-    if (Math.abs(paymentsTotal - Math.abs(total)) > 0.01) {
-      throw new Error(
-        `Pagos no cuadran: pagos=${paymentsTotal.toFixed(2)} total=${Math.abs(total).toFixed(2)}`,
-      );
+    // Tickets abiertos (parked): se persisten sin pagos y NO descuentan stock
+    // (el RPC create_receipt_with_lines gatilla apply_receipt_to_stock sólo
+    // cuando status='completed'). Stock se mueve al cerrar la venta real.
+    const isParked = !!input.parkedName;
+    if (isParked && !input.parkedName?.trim()) {
+      throw new Error('Ticket abierto requiere un nombre identificador.');
+    }
+    if (!isParked) {
+      const paymentsTotal = sum(input.paymentSplits.map(p => p.amount));
+      if (Math.abs(paymentsTotal - Math.abs(total)) > 0.01) {
+        throw new Error(
+          `Pagos no cuadran: pagos=${paymentsTotal.toFixed(2)} total=${Math.abs(total).toFixed(2)}`,
+        );
+      }
     }
     if (input.type === 'sale' && total < 0) {
       throw new Error('Total negativo en venta');
