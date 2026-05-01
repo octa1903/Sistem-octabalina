@@ -65,19 +65,28 @@ export function rowToCamel<T extends object>(row: Record<string, unknown>): T {
 
 /**
  * Convierte un objeto camelCase a snake_case para enviar a Supabase.
+ *
+ * Retorna `any` deliberadamente: los tipos generados por `supabase gen types`
+ * usan `RejectExcessProperties` y cada Insert/Update tiene una forma exacta
+ * por tabla. Si tipáramos esto como `Record<string, unknown>`, todos los
+ * `.insert(camelToRow(...))` chocarían con la firma exacta. La capa de
+ * runtime ya garantiza que las claves matchean (y RLS/Postgres son la
+ * fuente de verdad si algo se desvía).
  */
-export function camelToRow(obj: Record<string, unknown>): Record<string, unknown> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function camelToRow(obj: Record<string, unknown>): any {
   return mapKeysShallow(obj, toSnake);
 }
 
 /**
- * Filtra propiedades undefined de un objeto antes de mandarlo a Supabase
- * (para no sobreescribir columnas con NULL accidentalmente).
+ * Filtra propiedades undefined antes de mandar a Supabase (no sobreescribir
+ * columnas con NULL). Retorna `any` por la misma razón que camelToRow.
  */
-export function stripUndefined<T extends Record<string, unknown>>(obj: T): T {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function stripUndefined<T extends Record<string, unknown>>(obj: T): any {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj)) {
     if (v !== undefined) out[k] = v;
   }
-  return out as T;
+  return out;
 }

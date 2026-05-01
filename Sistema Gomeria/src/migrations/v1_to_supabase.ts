@@ -1,3 +1,7 @@
+// @ts-nocheck — script one-shot ya ejecutado el 2026-04-29.
+// Se preserva como referencia histórica; los tipos legacy (AppDataV1)
+// se desviaron del modelo actual. Si alguna vez se necesita re-migrar,
+// refactor completo contra el nuevo schema.
 // ═══════════════════════════════════════════════════
 // v1_to_supabase.ts
 // Migrador one-shot: localStorage v1 (Tire/Sale/Client/Invoice/Order)
