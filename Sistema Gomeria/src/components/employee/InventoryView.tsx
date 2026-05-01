@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import type { Tire, TireV2, TireStoreOverride, Category } from '@/types';
+import type { Tire, TireV2, TireStoreOverride, Category, Tax } from '@/types';
 import { tireService } from '@/services/storageService';
 import { tireServiceV2 } from '@/services/tireServiceV2';
 import { categoryService } from '@/services/categoryService';
+import { taxService } from '@/services/taxService';
 import { formatCurrency, calculateSalePrice } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
 import { ImportModal } from '@/components/employee/import/ImportModal';
@@ -21,6 +22,7 @@ interface FormState {
   sku: string;
   cost: number;
   margin: number;
+  taxIds: string[];
   // Por tienda activa
   price: number;
   stock: number;
@@ -31,7 +33,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = {
   brand: '', model: '', size: '', categoryId: '', sku: '',
-  cost: 0, margin: 30, price: 0,
+  cost: 0, margin: 30, price: 0, taxIds: [],
   stock: 0, lowStockThreshold: 2, location: '', notes: '',
 };
 
@@ -48,6 +50,8 @@ function unmirrorTire(id: string) {
 export function InventoryView({ addToast, activeStoreId }: Props) {
   const [tires, setTires] = useState<Tire[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [taxes, setTaxes] = useState<Tax[]>([]);
+  const [tireTaxIdsById, setTireTaxIdsById] = useState<Map<string, string[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('');
@@ -64,11 +68,16 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
     if (!activeStoreId) return;
     try {
       setLoading(true);
-      const [tiresV2, cats, overrides] = await Promise.all([
+      const [tiresV2, cats, overrides, allTaxes] = await Promise.all([
         tireServiceV2.getAll(),
         categoryService.getAll(),
         tireServiceV2.getOverridesByStore(activeStoreId),
+        taxService.getAll(),
       ]);
+      const taxMap = new Map<string, string[]>();
+      tiresV2.forEach(t => taxMap.set(t.id, t.taxIds ?? []));
+      setTaxes(allTaxes);
+      setTireTaxIdsById(taxMap);
       const overrideByTire = new Map<string, TireStoreOverride>();
       overrides.forEach(o => overrideByTire.set(o.tireId, o));
       const catNameById = new Map<string, string>();
@@ -115,9 +124,12 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
 
   function openNew() {
     setEditing(null);
+    // Defaults: impuestos con apply_to_new_tires=true
+    const defaultTaxIds = taxes.filter(t => t.applyToNewTires).map(t => t.id);
     setForm({
       ...EMPTY_FORM,
       categoryId: categories.find(c => c.name === 'Auto')?.id ?? categories[0]?.id ?? '',
+      taxIds: defaultTaxIds,
     });
     setModalOpen(true);
   }
@@ -133,6 +145,7 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
       sku: '',  // no se exponía en v1, queda en blanco al editar
       cost: t.costPrice,
       margin: t.margin,
+      taxIds: tireTaxIdsById.get(t.id) ?? [],
       price: t.salePrice,
       stock: t.stock,
       lowStockThreshold: t.minStock,
@@ -168,6 +181,7 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
         defaultPrice: form.price,
         sku: form.sku || undefined,
         notes: form.notes || undefined,
+        taxIds: form.taxIds,
         availableInAllStores: true,
       };
       const savedTire = await tireServiceV2.save(tireV2);
@@ -408,6 +422,31 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
                   <Inp value={form.notes} onChange={v => setFormField('notes', v)} />
                 </Field>
               </div>
+              {taxes.length > 0 && (
+                <div className="col-span-2">
+                  <Field label="Impuestos aplicados">
+                    <div className="space-y-1.5 mt-1">
+                      {taxes.map(tax => (
+                        <label key={tax.id} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--br-txt)' }}>
+                          <input
+                            type="checkbox"
+                            checked={form.taxIds.includes(tax.id)}
+                            onChange={(e) => {
+                              setForm(prev => ({
+                                ...prev,
+                                taxIds: e.target.checked
+                                  ? [...prev.taxIds, tax.id]
+                                  : prev.taxIds.filter(id => id !== tax.id),
+                              }));
+                            }}
+                          />
+                          <span>{tax.name} <span className="font-mono text-xs" style={{ color: 'var(--br-txt2)' }}>{tax.rate}% · {tax.inclusion === 'included' ? 'incluido' : 'agregado'}</span></span>
+                        </label>
+                      ))}
+                    </div>
+                  </Field>
+                </div>
+              )}
             </div>
           </section>
 

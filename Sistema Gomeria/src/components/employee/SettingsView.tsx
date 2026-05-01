@@ -3,6 +3,7 @@ import type { OrderConfig, WholesaleConfig } from '@/types';
 import type { useAuth } from '@/hooks/useAuth';
 import { configService, backupService } from '@/services/storageService';
 import { Modal } from '@/components/ui/Modal';
+import { TaxesSection } from './settings/TaxesSection';
 import { Key, Download, Upload, ToggleLeft, ToggleRight } from 'lucide-react';
 
 type AuthReturn = ReturnType<typeof useAuth>;
@@ -108,6 +109,9 @@ export function SettingsView({ auth, addToast }: Props) {
   return (
     <div className="p-5 max-w-3xl mx-auto space-y-5">
       <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Configuración</h1>
+
+      {/* Taxes */}
+      <TaxesSection addToast={addToast} />
 
       {/* Security */}
       <Section title="Seguridad">

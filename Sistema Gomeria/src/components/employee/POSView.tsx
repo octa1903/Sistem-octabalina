@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type {
-  TireV2, TireStoreOverride, Category, Customer, PaymentMethod, CashSession,
+  TireV2, TireStoreOverride, Category, Customer, PaymentMethod, CashSession, Tax,
   Sale, SaleItem, Tire,
   BuildReceiptInput, LoyaltyConfig,
 } from '@/types';
@@ -9,6 +9,7 @@ import { tireServiceV2 } from '@/services/tireServiceV2';
 import { categoryService } from '@/services/categoryService';
 import { customerServiceV2 } from '@/services/customerServiceV2';
 import { receiptService } from '@/services/receiptService';
+import { taxService } from '@/services/taxService';
 import { supabase } from '@/services/supabaseClient';
 import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
@@ -51,6 +52,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
+  const [taxes, setTaxes] = useState<Tax[]>([]);
   const [loyalty, setLoyalty] = useState<LoyaltyConfig>(DEFAULT_LOYALTY);
   const [loading, setLoading] = useState(true);
 
@@ -67,7 +69,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [tiresV2, cats, custs, ovr, pms, { data: loyaltyData }] = await Promise.all([
+      const [tiresV2, cats, custs, ovr, pms, taxesData, { data: loyaltyData }] = await Promise.all([
         tireServiceV2.getAll(),
         categoryService.getAll(),
         customerServiceV2.getAll(),
@@ -75,6 +77,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
         supabase.from('payment_methods').select('*').order('sort_order', { ascending: true }).then(r =>
           ensureNoError(r.data, r.error, 'POSView.paymentMethods').map(row => rowToCamel<PaymentMethod>(row)),
         ),
+        taxService.getAll(),
         supabase.from('loyalty_config').select('*').maybeSingle(),
       ]);
       const m = new Map<string, TireStoreOverride>();
@@ -84,6 +87,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
       setCategories(cats);
       setCustomers(custs);
       setPaymentMethods(pms);
+      setTaxes(taxesData);
       if (loyaltyData) {
         setLoyalty({
           enabled: loyaltyData.enabled,
@@ -147,6 +151,33 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
     ? subtotal / (1 - surchargeRate)
     : subtotal;
   const surchargeAmount = total - subtotal;
+
+  // Desglose de IVA: para cada item del carrito, sumar impuestos contenidos
+  // (price ya los incluye) y agregados (suman al total).
+  const taxesById = useMemo(() => new Map(taxes.map(t => [t.id, t])), [taxes]);
+  const taxBreakdown = useMemo(() => {
+    const included: Record<string, { name: string; amount: number }> = {};
+    const added: Record<string, { name: string; amount: number }> = {};
+    for (const ci of cart) {
+      const tireTaxIds = ci.tire.taxIds ?? [];
+      const net = ci.subtotal;
+      for (const tid of tireTaxIds) {
+        const tax = taxesById.get(tid);
+        if (!tax) continue;
+        if (tax.storeIds && !tax.storeIds.includes(storeId)) continue;
+        const amount = tax.inclusion === 'included'
+          ? net - net / (1 + tax.rate / 100)
+          : net * (tax.rate / 100);
+        const bucket = tax.inclusion === 'included' ? included : added;
+        if (!bucket[tid]) bucket[tid] = { name: tax.name, amount: 0 };
+        bucket[tid].amount += amount;
+      }
+    }
+    return {
+      included: Object.values(included),
+      added: Object.values(added),
+    };
+  }, [cart, taxesById, storeId]);
 
   const selectedCustomer = customers.find(c => c.id === customerId);
 
@@ -229,7 +260,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
         getTire: id => tireById.get(id),
         getOverride: (tireId, sId) => sId === storeId ? overrideById.get(tireId) : undefined,
         getCategory: id => categoryById.get(id),
-        getTax: () => undefined,
+        getTax: id => taxesById.get(id),
         getDiscount: () => undefined,
         getPaymentMethod: id => pmById.get(id),
         loyalty,
@@ -445,6 +476,18 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
               <span>Subtotal</span>
               <span className="font-mono">{formatCurrency(subtotal)}</span>
             </div>
+            {taxBreakdown.included.map(t => (
+              <div key={t.name} className="flex justify-between text-xs" style={{ color: 'var(--br-txt2)' }}>
+                <span>{t.name} (incluido)</span>
+                <span className="font-mono">{formatCurrency(t.amount)}</span>
+              </div>
+            ))}
+            {taxBreakdown.added.map(t => (
+              <div key={t.name} className="flex justify-between text-xs" style={{ color: 'var(--br-txt2)' }}>
+                <span>+ {t.name}</span>
+                <span className="font-mono">{formatCurrency(t.amount)}</span>
+              </div>
+            ))}
             {surchargeRate > 0 && (
               <div className="flex justify-between text-xs" style={{ color: 'var(--br-txt2)' }}>
                 <span>Recargo {(surchargeRate * 100).toFixed(0)}%</span>
