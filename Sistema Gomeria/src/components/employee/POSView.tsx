@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type {
-  TireV2, TireStoreOverride, Category, Customer, PaymentMethod, CashSession, Tax,
-  Sale, SaleItem, Tire,
+  TireV2, TireStoreOverride, Category, Customer, PaymentMethod, CashSession, Tax, Store, ReceiptConfig,
+  Sale, SaleItem, Tire, Receipt, ReceiptLine,
   BuildReceiptInput, LoyaltyConfig,
 } from '@/types';
 import { tireService, saleService } from '@/services/storageService';
@@ -10,17 +10,27 @@ import { categoryService } from '@/services/categoryService';
 import { customerServiceV2 } from '@/services/customerServiceV2';
 import { receiptService } from '@/services/receiptService';
 import { taxService } from '@/services/taxService';
+import { storeService } from '@/services/storeService';
+import { receiptConfigService } from '@/services/receiptConfigService';
 import { supabase } from '@/services/supabaseClient';
 import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
+import { printReceipt } from '@/utils/printReceipt';
 import { Modal } from '@/components/ui/Modal';
-import { Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle, Lock } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle, Lock, Printer } from 'lucide-react';
 
 interface Props {
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   storeId: string;
   cashSession: CashSession | null;
   employeeId: string | null;
+  employeeName?: string;
+}
+
+interface LastReceiptData {
+  receipt: Receipt;
+  lines: ReceiptLine[];
+  customer: Customer | null;
 }
 
 interface CartItem {
@@ -46,13 +56,15 @@ async function nextReceiptNumber(storeId: string): Promise<string> {
   return `TPV-${String(next).padStart(4, '0')}`;
 }
 
-export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
+export function POSView({ addToast, storeId, cashSession, employeeId, employeeName }: Props) {
   const [tires, setTires] = useState<TireV2[]>([]);
   const [overridesByTire, setOverridesByTire] = useState<Map<string, TireStoreOverride>>(new Map());
   const [categories, setCategories] = useState<Category[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [taxes, setTaxes] = useState<Tax[]>([]);
+  const [store, setStore] = useState<Store | null>(null);
+  const [receiptConfig, setReceiptConfig] = useState<ReceiptConfig | null>(null);
   const [loyalty, setLoyalty] = useState<LoyaltyConfig>(DEFAULT_LOYALTY);
   const [loading, setLoading] = useState(true);
 
@@ -65,11 +77,12 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
   const [confirming, setConfirming] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<{ number: string; total: number; pmName: string } | null>(null);
+  const [lastReceiptData, setLastReceiptData] = useState<LastReceiptData | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [tiresV2, cats, custs, ovr, pms, taxesData, { data: loyaltyData }] = await Promise.all([
+      const [tiresV2, cats, custs, ovr, pms, taxesData, storeData, rConfig, { data: loyaltyData }] = await Promise.all([
         tireServiceV2.getAll(),
         categoryService.getAll(),
         customerServiceV2.getAll(),
@@ -78,6 +91,8 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
           ensureNoError(r.data, r.error, 'POSView.paymentMethods').map(row => rowToCamel<PaymentMethod>(row)),
         ),
         taxService.getAll(),
+        storeService.getById(storeId),
+        receiptConfigService.getByStore(storeId).catch(() => null),
         supabase.from('loyalty_config').select('*').maybeSingle(),
       ]);
       const m = new Map<string, TireStoreOverride>();
@@ -88,6 +103,8 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
       setCustomers(custs);
       setPaymentMethods(pms);
       setTaxes(taxesData);
+      setStore(storeData ?? null);
+      setReceiptConfig(rConfig);
       if (loyaltyData) {
         setLoyalty({
           enabled: loyaltyData.enabled,
@@ -303,7 +320,11 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
         }
       }
 
+      // Cargar líneas para el recibo imprimible
+      const recLines = await receiptService.getLines(receipt.id);
+
       setLastReceipt({ number: receipt.receiptNumber, total: receipt.total, pmName: selectedPm.name });
+      setLastReceiptData({ receipt, lines: recLines, customer: selectedCustomer ?? null });
       setCart([]);
       setCustomerId('');
       setCheckoutOpen(false);
@@ -557,7 +578,27 @@ export function POSView({ addToast, storeId, cashSession, employeeId }: Props) {
             </>
           )}
         </div>
-        <div className="text-center mt-2">
+        <div className="flex justify-center gap-2 mt-2">
+          <button
+            onClick={() => {
+              if (!lastReceiptData || !store) return;
+              printReceipt({
+                receipt: lastReceiptData.receipt,
+                lines: lastReceiptData.lines,
+                store,
+                config: receiptConfig,
+                paymentMethods,
+                taxes,
+                customer: lastReceiptData.customer,
+                employeeName,
+              });
+            }}
+            disabled={!lastReceiptData || !store}
+            className="px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
+            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}
+          >
+            <Printer className="h-4 w-4" /> Imprimir
+          </button>
           <button onClick={() => setSuccessOpen(false)} className="px-6 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-dark)' }}>
             Continuar
           </button>

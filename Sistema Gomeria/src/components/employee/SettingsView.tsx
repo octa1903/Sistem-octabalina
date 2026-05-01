@@ -4,17 +4,20 @@ import type { useAuth } from '@/hooks/useAuth';
 import { configService, backupService } from '@/services/storageService';
 import { Modal } from '@/components/ui/Modal';
 import { TaxesSection } from './settings/TaxesSection';
+import { ReceiptConfigSection } from './settings/ReceiptConfigSection';
 import { Key, Download, Upload, ToggleLeft, ToggleRight } from 'lucide-react';
 
 type AuthReturn = ReturnType<typeof useAuth>;
 interface Props {
   auth: AuthReturn;
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
+  activeStoreId?: string | null;
+  activeStoreName?: string;
 }
 
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-export function SettingsView({ auth, addToast }: Props) {
+export function SettingsView({ auth, addToast, activeStoreId, activeStoreName }: Props) {
   const [orderConfig, setOrderConfig] = useState<OrderConfig>(() => configService.getOrderConfig());
   const [wholesaleConfig, setWholesaleConfig] = useState<WholesaleConfig>(() => configService.getWholesaleConfig());
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -112,6 +115,13 @@ export function SettingsView({ auth, addToast }: Props) {
 
       {/* Taxes */}
       <TaxesSection addToast={addToast} />
+
+      {/* Receipt config */}
+      <ReceiptConfigSection
+        storeId={activeStoreId ?? null}
+        storeName={activeStoreName ?? 'Tienda'}
+        addToast={addToast}
+      />
 
       {/* Security */}
       <Section title="Seguridad">

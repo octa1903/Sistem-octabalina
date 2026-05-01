@@ -155,14 +155,14 @@ export function EmployeeApp({ auth }: Props) {
             </div>
           ) : (
             <>
-              {tab === 'pos'       && <POSView       addToast={addToast} storeId={stores.activeStoreId} cashSession={cash.session} employeeId={auth.employeeId ?? null} />}
+              {tab === 'pos'       && <POSView       addToast={addToast} storeId={stores.activeStoreId} cashSession={cash.session} employeeId={auth.employeeId ?? null} employeeName={auth.employeeName} />}
               {tab === 'inventory' && <InventoryView addToast={addToast} activeStoreId={stores.activeStoreId} />}
               {tab === 'clients'   && <ClientsView   addToast={addToast} />}
               {tab === 'accounts'  && <AccountsView  addToast={addToast} employeeId={auth.employeeId ?? null} />}
               {tab === 'invoices'  && <InvoicesView  addToast={addToast} />}
               {tab === 'orders'    && <OrdersView    addToast={addToast} />}
               {tab === 'analytics' && <AnalyticsView storeId={stores.activeStoreId} />}
-              {tab === 'settings'  && <SettingsView  auth={auth} addToast={addToast} />}
+              {tab === 'settings'  && <SettingsView  auth={auth} addToast={addToast} activeStoreId={stores.activeStoreId} activeStoreName={stores.activeStore?.name} />}
             </>
           )}
         </main>
