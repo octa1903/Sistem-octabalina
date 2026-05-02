@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Tire, TireV2, TireStoreOverride, Category, Tax } from '@/types';
-import { tireService } from '@/services/storageService';
 import { tireServiceV2 } from '@/services/tireServiceV2';
 import { categoryService } from '@/services/categoryService';
 import { taxService } from '@/services/taxService';
@@ -36,16 +35,6 @@ const EMPTY_FORM: FormState = {
   cost: 0, margin: 30, price: 0, taxIds: [],
   stock: 0, lowStockThreshold: 2, location: '', notes: '',
 };
-
-// Espejo legacy: mantiene balina_tires sincronizado con Supabase para
-// que POSView/AnalyticsView (todavía legacy) sigan viendo los datos.
-// Quitar cuando todo esté migrado.
-function mirrorTireToLegacy(t: Tire) {
-  tireService.save(t);
-}
-function unmirrorTire(id: string) {
-  tireService.delete(id);
-}
 
 export function InventoryView({ addToast, activeStoreId }: Props) {
   const [tires, setTires] = useState<Tire[]>([]);
@@ -88,14 +77,6 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
       );
       setTires(legacyList);
       setCategories(cats);
-
-      // Sincronizar mirror local: borrar lo que ya no está, guardar todo el set
-      const localIds = new Set(tireService.getAll().map(t => t.id));
-      const remoteIds = new Set(legacyList.map(t => t.id));
-      for (const id of localIds) {
-        if (!remoteIds.has(id)) tireService.delete(id);
-      }
-      legacyList.forEach(mirrorTireToLegacy);
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error cargando inventario', 'error');
     } finally {
@@ -187,7 +168,7 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
       const savedTire = await tireServiceV2.save(tireV2);
 
       // 2. Upsert override de la tienda activa
-      const savedOverride = await tireServiceV2.upsertOverride({
+      await tireServiceV2.upsertOverride({
         tireId: savedTire.id,
         storeId: activeStoreId,
         available: true,
@@ -196,10 +177,6 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
         lowStockThreshold: form.lowStockThreshold,
         location: form.location || undefined,
       });
-
-      // 3. Mirror legacy
-      const catName = categories.find(c => c.id === form.categoryId)?.name ?? 'Sin categoría';
-      mirrorTireToLegacy(tireServiceV2.toLegacy(savedTire, savedOverride, catName));
 
       await refresh();
       setModalOpen(false);
@@ -215,7 +192,6 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
     if (!deleting) return;
     try {
       await tireServiceV2.delete(deleting.id);  // overrides cascadean por FK
-      unmirrorTire(deleting.id);
       await refresh();
       setDeleting(null);
       addToast('Neumático eliminado.', 'warning');

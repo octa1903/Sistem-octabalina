@@ -1,9 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { useAuth } from '@/hooks/useAuth';
-import { clientService } from '@/services/storageService';
+import { customerServiceV2 } from '@/services/customerServiceV2';
 import { Eye, EyeOff, LogIn, Mail } from 'lucide-react';
 
 type AuthReturn = ReturnType<typeof useAuth>;
+
+interface ClientPick {
+  id: string;
+  name: string;
+  tipoCliente: 'minorista' | 'mayorista';
+  hasPin: boolean;
+}
 
 interface Props {
   auth: AuthReturn;
@@ -18,8 +25,40 @@ export function LoginScreen({ auth }: Props) {
   const [selectedClientId, setSelectedClientId] = useState('');
   const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
+  const [clients, setClients] = useState<ClientPick[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(false);
+  const [clientsError, setClientsError] = useState<string | null>(null);
+  const clientsLoadedRef = useRef(false);
 
-  const clients = clientService.getAll();
+  // Cargar lista de clientes una sola vez, cuando el usuario abre el tab cliente.
+  useEffect(() => {
+    if (mode !== 'client' || clientsLoadedRef.current) return;
+    clientsLoadedRef.current = true;
+    let active = true;
+    setClientsLoading(true);
+    setClientsError(null);
+    customerServiceV2
+      .getAll()
+      .then((customers) => {
+        if (!active) return;
+        setClients(
+          customers.map((c) => ({
+            id: c.id,
+            name: c.name,
+            tipoCliente: c.customerType === 'wholesale' ? 'mayorista' : 'minorista',
+            hasPin: !!c.pinHash,
+          })),
+        );
+      })
+      .catch((e) => {
+        if (!active) return;
+        clientsLoadedRef.current = false; // permitir reintento si falló
+        setClientsError(e instanceof Error ? e.message : 'Error cargando clientes');
+      })
+      .finally(() => active && setClientsLoading(false));
+    return () => { active = false; };
+  }, [mode]);
+
   const filteredClients = clients.filter((c) =>
     c.name.toLowerCase().includes(clientSearch.toLowerCase()),
   );
@@ -180,7 +219,11 @@ export function LoginScreen({ auth }: Props) {
                     autoFocus
                   />
                   <div className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--br-bor)' }}>
-                    {filteredClients.length === 0 ? (
+                    {clientsLoading ? (
+                      <p className="px-3 py-3 text-sm" style={{ color: 'var(--br-txt2)' }}>Cargando clientes…</p>
+                    ) : clientsError ? (
+                      <p className="px-3 py-3 text-sm" style={{ color: 'var(--br-red)' }}>{clientsError}</p>
+                    ) : filteredClients.length === 0 ? (
                       <p className="px-3 py-3 text-sm" style={{ color: 'var(--br-txt2)' }}>
                         {clients.length === 0
                           ? 'No hay clientes registrados. Un empleado debe crearlos primero.'
@@ -221,7 +264,7 @@ export function LoginScreen({ auth }: Props) {
                     </button>
                   </div>
 
-                  {!selectedClient?.pinHash ? (
+                  {!selectedClient?.hasPin ? (
                     <p className="text-sm rounded-lg px-3 py-2" style={{ background: 'var(--br-amb-bg)', color: 'var(--br-amb)', border: '1px solid var(--br-amb-bor)' }}>
                       Este cliente no tiene PIN configurado. Solicite uno al empleado.
                     </p>
@@ -254,7 +297,7 @@ export function LoginScreen({ auth }: Props) {
                 </p>
               )}
 
-              {selectedClientId && selectedClient?.pinHash && (
+              {selectedClientId && selectedClient?.hasPin && (
                 <button
                   type="submit"
                   disabled={loading || !pin}

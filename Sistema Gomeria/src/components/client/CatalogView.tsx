@@ -1,6 +1,10 @@
-import { useState, useMemo } from 'react';
-import type { Tire, Order, OrderItem } from '@/types';
-import { tireService, orderService, configService, clientService } from '@/services/storageService';
+import { useState, useMemo, useEffect } from 'react';
+import type { Tire, Customer, Order, OrderItem } from '@/types';
+import { orderService, configService } from '@/services/storageService';
+import { tireServiceV2 } from '@/services/tireServiceV2';
+import { customerServiceV2 } from '@/services/customerServiceV2';
+import { categoryService } from '@/services/categoryService';
+import { storeService } from '@/services/storeService';
 import { TIRE_CATEGORIES, PAYMENT_METHODS } from '@/constants';
 import { formatCurrency } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
@@ -14,7 +18,9 @@ interface Props {
 interface CartEntry { tire: Tire; quantity: number; }
 
 export function CatalogView({ clientId, addToast }: Props) {
-  const [tires] = useState<Tire[]>(() => tireService.getAll().filter((t) => t.salePrice > 0 && t.stock > 0));
+  const [tires, setTires] = useState<Tire[]>([]);
+  const [client, setClient] = useState<Customer | null>(null);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('');
   const [cart, setCart] = useState<CartEntry[]>([]);
@@ -26,10 +32,52 @@ export function CatalogView({ clientId, addToast }: Props) {
   const [orderAddress, setOrderAddress] = useState('');
   const [orderPayment, setOrderPayment] = useState('efectivo');
 
+  // Orders + config siguen en localStorage (Fase 6)
   const orderConfig = useMemo(() => configService.getOrderConfig(), []);
-  const client = useMemo(() => clientService.getById(clientId), [clientId]);
 
-  const discountPct = client?.tipoCliente === 'mayorista' ? client.descuentoMayorista : 0;
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    (async () => {
+      try {
+        // Catálogo: usamos la primera tienda como tienda de referencia para precios/stock.
+        // En Fase 6 (portal cliente) el cliente elegirá tienda explícitamente.
+        const stores = await storeService.getAll();
+        const refStoreId = stores[0]?.id ?? null;
+        if (!refStoreId) {
+          if (active) {
+            setTires([]);
+            addToast('No hay tiendas configuradas. Contactá a la gomería.', 'warning');
+          }
+          return;
+        }
+        const [tiresV2, cats, overrides, customer] = await Promise.all([
+          tireServiceV2.getAll(),
+          categoryService.getAll(),
+          tireServiceV2.getOverridesByStore(refStoreId),
+          customerServiceV2.getById(clientId),
+        ]);
+        if (!active) return;
+        const overrideByTire = new Map(overrides.map(o => [o.tireId, o]));
+        const catNameById = new Map(cats.map(c => [c.id, c.name]));
+        const list = tiresV2
+          .map(t => tireServiceV2.toLegacy(t, overrideByTire.get(t.id), catNameById.get(t.categoryId) ?? 'Sin categoría'))
+          .filter(t => t.salePrice > 0 && t.stock > 0);
+        setTires(list);
+        setClient(customer ?? null);
+      } catch (e) {
+        if (active) addToast(e instanceof Error ? e.message : 'Error cargando catálogo', 'error');
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => { active = false; };
+    // addToast se omite intencionalmente: si el padre lo recrea en cada render
+    // el catálogo se recargaría sin parar. Suponemos referencia estable (useToast).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clientId]);
+
+  const discountPct = client?.customerType === 'wholesale' ? (client.wholesaleDiscount ?? 0) : 0;
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -100,6 +148,7 @@ export function CatalogView({ clientId, addToast }: Props) {
       updatedAt: now,
     };
 
+    // Orders aún en localStorage hasta Fase 6 (portal cliente Supabase).
     orderService.save(order);
     setCart([]);
     setOrderOpen(false);
@@ -147,8 +196,12 @@ export function CatalogView({ clientId, addToast }: Props) {
         </select>
       </div>
 
+      {loading && (
+        <p className="text-sm text-center py-10" style={{ color: 'var(--br-txt2)' }}>Cargando catálogo…</p>
+      )}
+
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {filtered.map((t) => {
+        {!loading && filtered.map((t) => {
           const price = priceFor(t);
           const inCart = cart.find((i) => i.tire.id === t.id);
           return (
@@ -189,7 +242,7 @@ export function CatalogView({ clientId, addToast }: Props) {
             </div>
           );
         })}
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <p className="col-span-3 text-sm text-center py-10" style={{ color: 'var(--br-txt2)' }}>Sin productos disponibles.</p>
         )}
       </div>

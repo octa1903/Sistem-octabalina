@@ -1,14 +1,50 @@
-import { useMemo } from 'react';
-import { clientService } from '@/services/storageService';
+import { useEffect, useState } from 'react';
+import type { Customer, CustomerAccountMovement } from '@/types';
+import { customerServiceV2 } from '@/services/customerServiceV2';
 import { formatCurrency } from '@/utils/currency';
 import { Phone, MapPin, Mail, TrendingDown } from 'lucide-react';
 
 interface Props { clientId: string; }
 
-export function AccountView({ clientId }: Props) {
-  const client = useMemo(() => clientService.getById(clientId), [clientId]);
+function formatAddress(addr: Customer['address']): string {
+  if (!addr) return '';
+  if (typeof addr === 'string') return addr;
+  return [addr.street, addr.city].filter(Boolean).join(', ');
+}
 
-  if (!client) return null;
+export function AccountView({ clientId }: Props) {
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [movements, setMovements] = useState<CustomerAccountMovement[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    setError(null);
+    Promise.all([
+      customerServiceV2.getById(clientId),
+      customerServiceV2.getMovements(clientId),
+    ])
+      .then(([c, m]) => {
+        if (!active) return;
+        setCustomer(c ?? null);
+        setMovements(m);
+      })
+      .catch((e) => active && setError(e instanceof Error ? e.message : 'Error cargando cuenta'))
+      .finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, [clientId]);
+
+  if (loading) return <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>Cargando cuenta…</p>;
+  if (error) return <p className="text-sm" style={{ color: 'var(--br-red)' }}>{error}</p>;
+  if (!customer) return null;
+
+  const isMayorista = customer.customerType === 'wholesale';
+  const descuentoMayorista = customer.wholesaleDiscount ?? 0;
+  const balance = customer.accountBalance;
+  const cupo = customer.creditLimit;
+  const address = formatAddress(customer.address);
 
   return (
     <div>
@@ -19,31 +55,31 @@ export function AccountView({ clientId }: Props) {
         <div className="rounded-xl p-5" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
           <div className="flex items-center gap-4 mb-4">
             <div className="w-14 h-14 rounded-full flex items-center justify-center text-white text-xl font-bold"
-              style={{ background: client.tipoCliente === 'mayorista' ? 'var(--br-amb)' : 'var(--br-dark)' }}>
-              {client.name.charAt(0).toUpperCase()}
+              style={{ background: isMayorista ? 'var(--br-amb)' : 'var(--br-dark)' }}>
+              {customer.name.charAt(0).toUpperCase()}
             </div>
             <div>
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--br-txt)' }}>{client.name}</h2>
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--br-txt)' }}>{customer.name}</h2>
               <span className="text-sm px-2 py-0.5 rounded-full font-medium"
-                style={{ background: client.tipoCliente === 'mayorista' ? 'var(--br-amb-bg)' : 'var(--br-sur2)', color: client.tipoCliente === 'mayorista' ? 'var(--br-amb)' : 'var(--br-txt2)' }}>
-                {client.tipoCliente === 'mayorista' ? 'Mayorista' : 'Minorista'}
+                style={{ background: isMayorista ? 'var(--br-amb-bg)' : 'var(--br-sur2)', color: isMayorista ? 'var(--br-amb)' : 'var(--br-txt2)' }}>
+                {isMayorista ? 'Mayorista' : 'Minorista'}
               </span>
             </div>
           </div>
           <div className="space-y-2">
-            {client.phone && (
+            {customer.phone && (
               <p className="flex items-center gap-2 text-sm" style={{ color: 'var(--br-txt2)' }}>
-                <Phone className="h-4 w-4" /> {client.phone}
+                <Phone className="h-4 w-4" /> {customer.phone}
               </p>
             )}
-            {client.address && (
+            {address && (
               <p className="flex items-center gap-2 text-sm" style={{ color: 'var(--br-txt2)' }}>
-                <MapPin className="h-4 w-4" /> {client.address}
+                <MapPin className="h-4 w-4" /> {address}
               </p>
             )}
-            {client.email && (
+            {customer.email && (
               <p className="flex items-center gap-2 text-sm" style={{ color: 'var(--br-txt2)' }}>
-                <Mail className="h-4 w-4" /> {client.email}
+                <Mail className="h-4 w-4" /> {customer.email}
               </p>
             )}
           </div>
@@ -52,49 +88,54 @@ export function AccountView({ clientId }: Props) {
         {/* Balance */}
         <div className="rounded-xl p-5" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
           <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--br-txt2)' }}>Cuenta corriente</p>
-          <p className="text-3xl font-bold font-mono" style={{ color: client.balance > 0 ? 'var(--br-red)' : client.balance < 0 ? 'var(--br-grn)' : 'var(--br-txt)' }}>
-            {formatCurrency(Math.abs(client.balance))}
+          <p className="text-3xl font-bold font-mono" style={{ color: balance > 0 ? 'var(--br-red)' : balance < 0 ? 'var(--br-grn)' : 'var(--br-txt)' }}>
+            {formatCurrency(Math.abs(balance))}
           </p>
           <p className="text-sm mt-1" style={{ color: 'var(--br-txt2)' }}>
-            {client.balance > 0 ? 'Saldo deudor — contactá a la gomería para regularizar.' : client.balance < 0 ? 'Saldo a tu favor.' : 'Sin saldo pendiente.'}
+            {balance > 0 ? 'Saldo deudor — contactá a la gomería para regularizar.' : balance < 0 ? 'Saldo a tu favor.' : 'Sin saldo pendiente.'}
           </p>
-          {client.cupoCredito > 0 && (
-            <p className="text-sm mt-2" style={{ color: 'var(--br-txt2)' }}>Cupo crédito: <strong className="font-mono">{formatCurrency(client.cupoCredito)}</strong></p>
+          {cupo > 0 && (
+            <p className="text-sm mt-2" style={{ color: 'var(--br-txt2)' }}>Cupo crédito: <strong className="font-mono">{formatCurrency(cupo)}</strong></p>
           )}
         </div>
 
         {/* Benefits */}
-        {client.tipoCliente === 'mayorista' && client.descuentoMayorista > 0 && (
+        {isMayorista && descuentoMayorista > 0 && (
           <div className="rounded-xl p-5" style={{ background: 'var(--br-grn-bg)', border: '1px solid var(--br-grn-bor)' }}>
             <div className="flex items-center gap-2 mb-1">
               <TrendingDown className="h-5 w-5" style={{ color: 'var(--br-grn)' }} />
               <p className="font-semibold text-sm" style={{ color: 'var(--br-grn)' }}>Beneficio mayorista</p>
             </div>
-            <p className="text-2xl font-bold" style={{ color: 'var(--br-grn)' }}>{client.descuentoMayorista}% descuento</p>
+            <p className="text-2xl font-bold" style={{ color: 'var(--br-grn)' }}>{descuentoMayorista}% descuento</p>
             <p className="text-sm mt-1" style={{ color: 'var(--br-grn)' }}>en todos los productos del catálogo.</p>
           </div>
         )}
 
-        {/* Recent payments */}
-        {client.payments.length > 0 && (
+        {/* Recent movements */}
+        {movements.length > 0 && (
           <div className="rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
             <div className="px-5 py-3" style={{ background: 'var(--br-sur2)', borderBottom: '1px solid var(--br-bor)' }}>
               <p className="text-sm font-semibold" style={{ color: 'var(--br-txt)' }}>Últimos movimientos</p>
             </div>
-            {[...client.payments].reverse().slice(0, 5).map((p) => (
-              <div key={p.id} className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-                <div>
-                  <p className="text-sm font-medium" style={{ color: 'var(--br-txt)' }}>{p.method}</p>
-                  <p className="text-xs" style={{ color: 'var(--br-txt2)' }}>
-                    {new Date(p.date).toLocaleDateString('es-AR')}
-                    {p.notes ? ` · ${p.notes}` : ''}
-                  </p>
+            {movements.slice(0, 5).map((m) => {
+              const isPayment = m.type === 'payment';
+              return (
+                <div key={m.id} className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--br-bor)' }}>
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--br-txt)' }}>
+                      {isPayment ? 'Pago' : 'Cargo'}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--br-txt2)' }}>
+                      {new Date(m.at).toLocaleDateString('es-AR')}
+                      {m.notes ? ` · ${m.notes}` : ''}
+                    </p>
+                  </div>
+                  <span className="font-mono text-sm font-semibold" style={{ color: isPayment ? 'var(--br-grn)' : 'var(--br-red)' }}>
+                    {isPayment ? '-' : '+'}{formatCurrency(m.amount)}
+                  </span>
                 </div>
-                <span className="font-mono text-sm font-semibold" style={{ color: 'var(--br-grn)' }}>
-                  {formatCurrency(p.amount)}
-                </span>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

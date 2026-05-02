@@ -15,17 +15,15 @@
     "jsx": "react-jsx",
 
     /* Path mapping */
-    "baseUrl": "./",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
 
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "ignoreDeprecations": "6.0"
+    "noFallthroughCasesInSwitch": true
   },
   "include": ["src", "vite.config.ts"]
 }

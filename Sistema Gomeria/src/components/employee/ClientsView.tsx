@@ -1,6 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import type { Client, Customer } from '@/types';
-import { clientService } from '@/services/storageService';
+import type { Client } from '@/types';
 import { customerServiceV2 } from '@/services/customerServiceV2';
 import { DEFAULT_PIN_HASH } from '@/constants';
 import { formatCurrency } from '@/utils/currency';
@@ -19,17 +18,6 @@ const EMPTY_FORM: ClientForm = {
   cupoCredito: 100000, pin: '1234',
 };
 
-// Espejo legacy: mantener localStorage en sync con Supabase mientras
-// el resto de las vistas (POS, Accounts, Analytics, etc.) sigan leyendo
-// del clientService viejo. Quitar cuando todo Phase 1 esté migrado.
-function mirrorToLegacy(customer: Customer) {
-  const legacy = customerServiceV2.toLegacy(customer);
-  clientService.save(legacy);
-}
-function unmirrorFromLegacy(id: string) {
-  clientService.delete(id);
-}
-
 export function ClientsView({ addToast }: Props) {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
@@ -38,15 +26,7 @@ export function ClientsView({ addToast }: Props) {
   async function refresh() {
     try {
       const customers = await customerServiceV2.getAll();
-      const legacy = customers.map(c => customerServiceV2.toLegacy(c));
-      setClients(legacy);
-      // sincronizar mirror local: borrar lo que ya no está y guardar todo el set
-      const localIds = new Set(clientService.getAll().map(c => c.id));
-      const remoteIds = new Set(customers.map(c => c.id));
-      for (const id of localIds) {
-        if (!remoteIds.has(id)) clientService.delete(id);
-      }
-      legacy.forEach(c => clientService.save(c));
+      setClients(customers.map(c => customerServiceV2.toLegacy(c)));
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error cargando clientes', 'error');
     } finally {
@@ -99,7 +79,7 @@ export function ClientsView({ addToast }: Props) {
     try {
       if (editing) {
         pinHash = form.pin ? await sha256(form.pin) : editing.pinHash;
-        const saved = await customerServiceV2.save({
+        await customerServiceV2.save({
           id: editing.id,
           name: form.name,
           phone: form.phone || undefined,
@@ -110,10 +90,9 @@ export function ClientsView({ addToast }: Props) {
           creditLimit: form.cupoCredito,
           pinHash,
         });
-        mirrorToLegacy(saved);
       } else {
         pinHash = form.pin ? await sha256(form.pin) : DEFAULT_PIN_HASH;
-        const saved = await customerServiceV2.save({
+        await customerServiceV2.save({
           name: form.name,
           phone: form.phone || undefined,
           email: form.email || undefined,
@@ -124,7 +103,6 @@ export function ClientsView({ addToast }: Props) {
           accountBalance: 0,
           pinHash,
         });
-        mirrorToLegacy(saved);
       }
       await refresh();
       setModalOpen(false);
@@ -138,7 +116,6 @@ export function ClientsView({ addToast }: Props) {
     if (!deleting) return;
     try {
       await customerServiceV2.delete(deleting.id);
-      unmirrorFromLegacy(deleting.id);
       await refresh();
       setDeleting(null);
       addToast('Cliente eliminado.', 'warning');

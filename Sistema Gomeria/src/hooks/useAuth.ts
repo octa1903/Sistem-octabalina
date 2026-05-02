@@ -1,8 +1,8 @@
 // ═══════════════════════════════════════════════════
 // Baliña Ruedas — Hook de autenticación
 // Empleado: Supabase Auth (email + password) + lookup en tabla employees.
-// Cliente: PIN contra clientService legacy (localStorage). Migración del
-//          login de cliente a Supabase queda para Fase 6 (portal cliente).
+// Cliente: PIN contra customers en Supabase (PIN sigue local — Fase 6
+//          migrará a Supabase Auth con magic link / OTP).
 // ═══════════════════════════════════════════════════
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -16,7 +16,7 @@ import {
   LOCKOUT_DURATION,
 } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
-import { clientService } from '@/services/storageService';
+import { customerServiceV2 } from '@/services/customerServiceV2';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -186,27 +186,44 @@ export function useAuth() {
     [loginAttempts, lockoutUntil],
   );
 
+  const clientLoginInFlight = useRef(false);
   const clientLogin = useCallback(
     async (clientId: string, pin: string): Promise<boolean> => {
+      if (clientLoginInFlight.current) return false;
+      clientLoginInFlight.current = true;
       setError(null);
-      const client = clientService.getById(clientId);
-      if (!client) {
-        setError('Cliente no encontrado.');
-        return false;
+      try {
+        let customer: Awaited<ReturnType<typeof customerServiceV2.getById>>;
+        try {
+          customer = await customerServiceV2.getById(clientId);
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'Error consultando cliente.');
+          return false;
+        }
+        if (!customer) {
+          setError('Cliente no encontrado.');
+          return false;
+        }
+        if (!customer.pinHash) {
+          setError('Este cliente no tiene PIN configurado.');
+          return false;
+        }
+        const valid = await verifyPin(pin, customer.pinHash);
+        if (!valid) {
+          setError('PIN incorrecto.');
+          return false;
+        }
+        setAuth({
+          isAuthenticated: true,
+          sessionType: 'client',
+          clientId: customer.id,
+          clientName: customer.name,
+          expiresAt: Date.now() + CLIENT_TIMEOUT,
+        });
+        return true;
+      } finally {
+        clientLoginInFlight.current = false;
       }
-      const valid = await verifyPin(pin, client.pinHash);
-      if (!valid) {
-        setError('PIN incorrecto.');
-        return false;
-      }
-      setAuth({
-        isAuthenticated: true,
-        sessionType: 'client',
-        clientId: client.id,
-        clientName: client.name,
-        expiresAt: Date.now() + CLIENT_TIMEOUT,
-      });
-      return true;
     },
     [],
   );

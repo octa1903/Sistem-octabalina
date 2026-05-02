@@ -63,6 +63,45 @@ export const receiptService = {
     return ensureNoError(data, error, 'receiptService.getLines').map(r => rowToCamel<ReceiptLine>(r));
   },
 
+  async getLinesForReceipts(receiptIds: string[]): Promise<Map<string, ReceiptLine[]>> {
+    const out = new Map<string, ReceiptLine[]>();
+    if (receiptIds.length === 0) return out;
+    for (const id of receiptIds) out.set(id, []);
+    // Chunkeamos para evitar URLs > ~8KB en el .in() (PostgREST manda los IDs
+    // como query string). 200 UUIDs ≈ 7.8KB con encoding.
+    const CHUNK = 200;
+    for (let i = 0; i < receiptIds.length; i += CHUNK) {
+      const slice = receiptIds.slice(i, i + CHUNK);
+      const { data, error } = await supabase
+        .from(LINES)
+        .select('*')
+        .in('receipt_id', slice);
+      const rows = ensureNoError(data, error, 'receiptService.getLinesForReceipts').map(r =>
+        rowToCamel<ReceiptLine>(r),
+      );
+      for (const ln of rows) {
+        const arr = out.get(ln.receiptId);
+        if (arr) arr.push(ln);
+      }
+    }
+    return out;
+  },
+
+  async getByCustomer(
+    customerId: string,
+    opts: { limit?: number } = {},
+  ): Promise<Receipt[]> {
+    let q = supabase
+      .from(TABLE)
+      .select('*')
+      .eq('customer_id', customerId)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false });
+    if (opts.limit) q = q.limit(opts.limit);
+    const { data, error } = await q;
+    return ensureNoError(data, error, 'receiptService.getByCustomer').map(r => rowToCamel<Receipt>(r));
+  },
+
   async getByStore(
     storeId: string,
     opts: { limit?: number; from?: string; to?: string } = {},

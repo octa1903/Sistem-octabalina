@@ -1,10 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type {
   TireV2, TireStoreOverride, Category, Customer, PaymentMethod, CashSession, Tax, Store, ReceiptConfig,
-  Sale, SaleItem, Tire, Receipt, ReceiptLine,
+  Receipt, ReceiptLine,
   BuildReceiptInput, LoyaltyConfig,
 } from '@/types';
-import { tireService, saleService } from '@/services/storageService';
 import { tireServiceV2 } from '@/services/tireServiceV2';
 import { categoryService } from '@/services/categoryService';
 import { customerServiceV2 } from '@/services/customerServiceV2';
@@ -308,42 +307,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         nextReceiptNumber,
       });
 
-      // Mirror legacy: guardar Sale + actualizar stock en localStorage
-      // así AnalyticsView/POSView legacy siguen viendo datos hasta que migren.
-      const saleItems: SaleItem[] = cart.map(ci => ({
-        tireId: ci.tire.id,
-        brand: ci.tire.brand,
-        model: ci.tire.model,
-        size: ci.tire.size,
-        quantity: ci.quantity,
-        unitPrice: ci.unitPrice,
-        subtotal: ci.subtotal,
-      }));
-      const sale: Sale = {
-        id: receipt.id,
-        items: saleItems,
-        total: receipt.total,
-        paymentMethod: selectedPm.name,
-        surcharge: selectedPm.surchargePercent,
-        clientId: customerId || undefined,
-        clientName: selectedCustomer?.name,
-        date: receipt.createdAt,
-        notes: '',
-      };
-      saleService.save(sale);
-      // El stock real ya bajó en Supabase via RPC apply_receipt_to_stock.
-      // Mirror local del nuevo stock:
-      for (const ci of cart) {
-        const fresh = tireService.getById(ci.tire.id);
-        if (fresh) {
-          tireService.save({
-            ...fresh,
-            stock: Math.max(0, fresh.stock - ci.quantity),
-            updatedAt: new Date().toISOString(),
-          } as Tire);
-        }
-      }
-
+      // Stock decrement ocurre atómicamente en RPC apply_receipt_to_stock.
       // Cargar líneas para el recibo imprimible
       const recLines = await receiptService.getLines(receipt.id);
 
