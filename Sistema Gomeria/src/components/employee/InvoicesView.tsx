@@ -1,6 +1,11 @@
-import { useState, useMemo } from 'react';
-import type { Invoice, InvoiceItem } from '@/types';
-import { invoiceService } from '@/services/storageService';
+// ═══════════════════════════════════════════════════
+// InvoicesView — Facturas a proveedores AFIP (Fase 6).
+// Migrada de localStorage a Supabase (tabla supplier_invoices).
+// ═══════════════════════════════════════════════════
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { SupplierInvoice } from '@/types';
+import { supplierInvoiceService } from '@/services/supplierInvoiceService';
 import { INVOICE_TYPES } from '@/constants';
 import { formatCurrency } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
@@ -8,9 +13,16 @@ import { Plus, Search, Edit2, Trash2, CheckCircle, XCircle } from 'lucide-react'
 
 interface Props { addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void; }
 
-type InvoiceForm = Omit<Invoice, 'id' | 'items' | 'subtotal' | 'iva' | 'total'> & {
+interface InvoiceForm {
+  type: 'A' | 'B' | 'C' | 'X';
+  number: string;
+  supplier: string;
+  date: string;
+  dueDate: string;
+  paid: boolean;
+  notes: string;
   items: { description: string; quantity: number; unitPrice: number }[];
-};
+}
 
 const EMPTY_FORM: InvoiceForm = {
   type: 'B', number: '', supplier: '', date: new Date().toISOString().slice(0, 10),
@@ -19,13 +31,28 @@ const EMPTY_FORM: InvoiceForm = {
 };
 
 export function InvoicesView({ addToast }: Props) {
-  const [invoices, setInvoices] = useState<Invoice[]>(() => invoiceService.getAll());
+  const [invoices, setInvoices] = useState<SupplierInvoice[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterPaid, setFilterPaid] = useState<'' | 'paid' | 'unpaid'>('');
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState<Invoice | null>(null);
+  const [editing, setEditing] = useState<SupplierInvoice | null>(null);
   const [form, setForm] = useState<InvoiceForm>({ ...EMPTY_FORM });
-  const [deleting, setDeleting] = useState<Invoice | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [deleting, setDeleting] = useState<SupplierInvoice | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      setInvoices(await supplierInvoiceService.getAll());
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error cargando facturas.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => { void refresh(); }, [refresh]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -45,50 +72,79 @@ export function InvoicesView({ addToast }: Props) {
     setModalOpen(true);
   }
 
-  function openEdit(inv: Invoice) {
+  function openEdit(inv: SupplierInvoice) {
     setEditing(inv);
     setForm({
-      type: inv.type, number: inv.number, supplier: inv.supplier,
-      date: inv.date.slice(0, 10), dueDate: inv.dueDate?.slice(0, 10) ?? '',
-      paid: inv.paid, notes: inv.notes,
+      type: inv.type,
+      number: inv.number,
+      supplier: inv.supplier,
+      date: inv.date.slice(0, 10),
+      dueDate: inv.dueDate?.slice(0, 10) ?? '',
+      paid: inv.paid,
+      notes: inv.notes ?? '',
       items: inv.items.map((i) => ({ description: i.description, quantity: i.quantity, unitPrice: i.unitPrice })),
     });
     setModalOpen(true);
   }
 
-  function saveInvoice() {
-    if (!form.supplier || !form.number) { addToast('Proveedor y número son obligatorios.', 'error'); return; }
-    const items: InvoiceItem[] = form.items
-      .filter((i) => i.description.trim())
-      .map((i) => ({ ...i, subtotal: i.quantity * i.unitPrice }));
-    const subtotal = items.reduce((s, i) => s + i.subtotal, 0);
-    const iva = form.type === 'A' ? subtotal * 0.21 : 0;
-    const total = subtotal + iva;
-    if (editing) {
-      invoiceService.save({ ...editing, ...form, items, subtotal, iva, total });
-    } else {
-      invoiceService.save({ id: `inv${Date.now()}`, ...form, items, subtotal, iva, total });
+  async function saveInvoice() {
+    if (!form.supplier.trim() || !form.number.trim()) {
+      addToast('Proveedor y número son obligatorios.', 'error');
+      return;
     }
-    setInvoices(invoiceService.getAll());
-    setModalOpen(false);
-    addToast(editing ? 'Factura actualizada.' : 'Factura guardada.', 'success');
+    const items = form.items
+      .filter((i) => i.description.trim())
+      .map((i) => ({ description: i.description, quantity: i.quantity, unitPrice: i.unitPrice, subtotal: i.quantity * i.unitPrice }));
+    if (items.length === 0) {
+      addToast('La factura debe tener al menos un ítem con descripción.', 'error');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await supplierInvoiceService.save({
+        id: editing?.id,
+        type: form.type,
+        number: form.number.trim(),
+        supplier: form.supplier.trim(),
+        date: form.date,
+        dueDate: form.dueDate || undefined,
+        items,
+        paid: form.paid,
+        notes: form.notes.trim() || undefined,
+      });
+      await refresh();
+      setModalOpen(false);
+      addToast(editing ? 'Factura actualizada.' : 'Factura guardada.', 'success');
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error guardando factura.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  function togglePaid(inv: Invoice) {
-    invoiceService.save({ ...inv, paid: !inv.paid });
-    setInvoices(invoiceService.getAll());
-    addToast(inv.paid ? 'Marcada como impaga.' : 'Marcada como pagada.', 'success');
+  async function togglePaid(inv: SupplierInvoice) {
+    try {
+      await supplierInvoiceService.setPaid(inv.id, !inv.paid);
+      await refresh();
+      addToast(inv.paid ? 'Marcada como impaga.' : 'Marcada como pagada.', 'success');
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error actualizando estado.', 'error');
+    }
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleting) return;
-    invoiceService.delete(deleting.id);
-    setInvoices(invoiceService.getAll());
-    setDeleting(null);
-    addToast('Factura eliminada.', 'warning');
+    try {
+      await supplierInvoiceService.delete(deleting.id);
+      await refresh();
+      setDeleting(null);
+      addToast('Factura eliminada.', 'warning');
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error eliminando.', 'error');
+    }
   }
 
-  function updateItem(idx: number, key: string, value: string | number) {
+  function updateItem(idx: number, key: 'description' | 'quantity' | 'unitPrice', value: string | number) {
     setForm((prev) => {
       const items = [...prev.items];
       items[idx] = { ...items[idx], [key]: value };
@@ -139,7 +195,9 @@ export function InvoicesView({ addToast }: Props) {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
+              {loading ? (
+                <tr><td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--br-txt2)' }}>Cargando...</td></tr>
+              ) : filtered.length === 0 ? (
                 <tr><td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--br-txt2)' }}>Sin facturas.</td></tr>
               ) : (
                 filtered.map((inv) => (
@@ -157,7 +215,7 @@ export function InvoicesView({ addToast }: Props) {
                     <td className="px-4 py-3 text-xs" style={{ color: 'var(--br-txt2)' }}>{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('es-AR') : '—'}</td>
                     <td className="px-4 py-3 font-mono font-semibold" style={{ color: 'var(--br-txt)' }}>{formatCurrency(inv.total)}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => togglePaid(inv)} className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full"
+                      <button onClick={() => void togglePaid(inv)} className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full"
                         style={{
                           color: inv.paid ? 'var(--br-grn)' : 'var(--br-red)',
                           background: inv.paid ? 'var(--br-grn-bg)' : 'var(--br-red-bg)',
@@ -190,19 +248,19 @@ export function InvoicesView({ addToast }: Props) {
       </div>
 
       {/* Invoice form modal */}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar factura' : 'Nueva factura'} size="lg">
+      <Modal open={modalOpen} onClose={() => !submitting && setModalOpen(false)} title={editing ? 'Editar factura' : 'Nueva factura'} size="lg">
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Tipo</label>
-              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as Invoice['type'] })}
+              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as InvoiceForm['type'] })}
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
                 {INVOICE_TYPES.map((t) => <option key={t} value={t}>Factura {t}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Número</label>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Número *</label>
               <input type="text" value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })}
                 placeholder="0001-00001234"
                 className="w-full px-3 py-2 rounded-lg text-sm outline-none"
@@ -269,8 +327,10 @@ export function InvoicesView({ addToast }: Props) {
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={saveInvoice} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-amb)' }}>Guardar</button>
+          <button onClick={() => setModalOpen(false)} disabled={submitting} className="px-4 py-2 rounded-lg text-sm disabled:opacity-50" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
+          <button onClick={() => void saveInvoice()} disabled={submitting} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
+            {submitting ? 'Guardando...' : 'Guardar'}
+          </button>
         </div>
       </Modal>
 
@@ -278,7 +338,7 @@ export function InvoicesView({ addToast }: Props) {
         <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>¿Eliminar factura {deleting?.type} {deleting?.number} de {deleting?.supplier}?</p>
         <div className="flex justify-end gap-2 mt-5">
           <button onClick={() => setDeleting(null)} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={confirmDelete} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-red)' }}>Eliminar</button>
+          <button onClick={() => void confirmDelete()} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-red)' }}>Eliminar</button>
         </div>
       </Modal>
     </div>
