@@ -1,273 +1,501 @@
-import { useState, useEffect, useMemo } from 'react';
-import type { Receipt, ReceiptLine, TireV2, TireStoreOverride, Customer, PaymentMethod } from '@/types';
-import { tireServiceV2 } from '@/services/tireServiceV2';
-import { customerServiceV2 } from '@/services/customerServiceV2';
-import { receiptService } from '@/services/receiptService';
-import { supabase } from '@/services/supabaseClient';
-import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
-import { orderService } from '@/services/storageService';
+// ═══════════════════════════════════════════════════
+// AnalyticsView — Back-office de informes Loyverse (Fase 4).
+// Filtros estándar (rango fecha, tienda, empleado) + 9 sub-vistas.
+// Toda la agregación pasa por funciones SQL `report_*` (0004_reports.sql).
+// ═══════════════════════════════════════════════════
+
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { Store, Employee } from '@/types';
+import { storeService } from '@/services/storeService';
+import { employeeService } from '@/services/employeeService';
+import {
+  reportService,
+  type ReportFilters,
+  type SalesSummary,
+  type SalesByItem,
+  type SalesByCategory,
+  type SalesByEmployee,
+  type SalesByPayment,
+  type SalesByTax,
+  type DiscountReportRow,
+  type ReceiptReportRow,
+  type CashSessionReportRow,
+} from '@/services/reportService';
 import { formatCurrency } from '@/utils/currency';
-import { STATUS_LABELS } from '@/constants';
-import { TrendingUp, Package, Users, ShoppingBag, AlertTriangle, BarChart2 } from 'lucide-react';
+import {
+  rangeForPreset,
+  dateInputToIso,
+  isoToDateInput,
+  rowsToCsv,
+  downloadCsv,
+  type CsvColumn,
+  type PeriodPreset,
+} from '@/utils/reports';
+import { Download, Calendar, RefreshCw } from 'lucide-react';
 
 interface Props {
   storeId: string;
 }
 
-interface ReceiptWithStore extends Receipt {}
+type ReportTab =
+  | 'summary'
+  | 'items'
+  | 'categories'
+  | 'employees'
+  | 'payments'
+  | 'receipts'
+  | 'discounts'
+  | 'taxes'
+  | 'cash';
+
+const TABS: { id: ReportTab; label: string }[] = [
+  { id: 'summary',    label: 'Resumen' },
+  { id: 'items',      label: 'Por artículo' },
+  { id: 'categories', label: 'Por categoría' },
+  { id: 'employees',  label: 'Por empleado' },
+  { id: 'payments',   label: 'Por pago' },
+  { id: 'receipts',   label: 'Recibos' },
+  { id: 'discounts',  label: 'Descuentos' },
+  { id: 'taxes',      label: 'Impuestos' },
+  { id: 'cash',       label: 'Caja' },
+];
+
+const PRESETS: { id: PeriodPreset; label: string }[] = [
+  { id: 'today',      label: 'Hoy' },
+  { id: 'yesterday',  label: 'Ayer' },
+  { id: 'this_week',  label: 'Esta semana' },
+  { id: 'this_month', label: 'Este mes' },
+  { id: 'last_month', label: 'Mes anterior' },
+  { id: 'last_30d',   label: 'Últ. 30 días' },
+  { id: 'custom',     label: 'Personalizado' },
+];
+
+interface ReportData {
+  summary: SalesSummary | null;
+  items: SalesByItem[];
+  categories: SalesByCategory[];
+  employees: SalesByEmployee[];
+  payments: SalesByPayment[];
+  receipts: ReceiptReportRow[];
+  discounts: DiscountReportRow[];
+  taxes: SalesByTax[];
+  cash: CashSessionReportRow[];
+}
+
+const EMPTY_DATA: ReportData = {
+  summary: null, items: [], categories: [], employees: [],
+  payments: [], receipts: [], discounts: [], taxes: [], cash: [],
+};
 
 export function AnalyticsView({ storeId }: Props) {
-  const [receipts, setReceipts] = useState<ReceiptWithStore[]>([]);
-  const [lines, setLines] = useState<(ReceiptLine & { receiptType: 'sale' | 'refund'; receiptDate: string })[]>([]);
-  const [tires, setTires] = useState<TireV2[]>([]);
-  const [overrides, setOverrides] = useState<TireStoreOverride[]>([]);
-  const [customers, setCustomers] = useState<Customer[]>([]);
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<ReportTab>('summary');
+  const [preset, setPreset] = useState<PeriodPreset>('this_month');
+  const [from, setFrom] = useState(() => isoToDateInput(rangeForPreset('this_month').from));
+  const [to, setTo] = useState(() => {
+    // En el input mostramos el último día inclusive (UI-friendly).
+    const r = rangeForPreset('this_month');
+    const endIso = new Date(new Date(r.to).getTime() - 86_400_000).toISOString();
+    return isoToDateInput(endIso);
+  });
+  const [filterStoreId, setFilterStoreId] = useState<string>(storeId);
+  const [filterEmployeeId, setFilterEmployeeId] = useState<string>('');
 
-  // Pedidos siguen en localStorage hasta Phase 6
-  const orders = useMemo(() => orderService.getAll(), []);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [employees, setEmployees] = useState<Employee[]>([]);
+  const [data, setData] = useState<ReportData>(EMPTY_DATA);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // Cargar tiendas y empleados (una sola vez)
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      setLoading(true);
       try {
-        const [recs, tiresV2, ovr, custs, pms] = await Promise.all([
-          receiptService.getByStore(storeId, { limit: 500 }),
-          tireServiceV2.getAll(),
-          tireServiceV2.getOverridesByStore(storeId),
-          customerServiceV2.getAll(),
-          supabase.from('payment_methods').select('*').then(r =>
-            ensureNoError(r.data, r.error, 'Analytics.pm').map(row => rowToCamel<PaymentMethod>(row)),
-          ),
-        ]);
-
-        // Cargar líneas de los receipts completados
-        const completedIds = recs.filter(r => r.status === 'completed').map(r => r.id);
-        const linesData = completedIds.length > 0
-          ? await supabase.from('receipt_lines').select('*').in('receipt_id', completedIds).then(r =>
-              ensureNoError(r.data, r.error, 'Analytics.lines').map(row => rowToCamel<ReceiptLine>(row)),
-            )
-          : [];
-        const recById = new Map(recs.map(r => [r.id, r]));
-        const enrichedLines = linesData.map(l => {
-          const rec = recById.get(l.receiptId);
-          return {
-            ...l,
-            receiptType: rec?.type ?? 'sale',
-            receiptDate: rec?.createdAt ?? '',
-          };
-        }) as (ReceiptLine & { receiptType: 'sale' | 'refund'; receiptDate: string })[];
-
+        const [st, emps] = await Promise.all([storeService.getAll(), employeeService.getAll()]);
         if (cancelled) return;
-        setReceipts(recs);
-        setLines(enrichedLines);
-        setTires(tiresV2);
-        setOverrides(ovr);
-        setCustomers(custs);
-        setPaymentMethods(pms);
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error('[Analytics] load error', e);
-      } finally {
-        if (!cancelled) setLoading(false);
+        setStores(st);
+        setEmployees(emps);
+      } catch {
+        // ignore — los filtros caerán a "todas/todos"
       }
     })();
     return () => { cancelled = true; };
-  }, [storeId]);
+  }, []);
 
-  const today = new Date().toISOString().slice(0, 10);
-  const thisMonth = new Date().toISOString().slice(0, 7);
-
-  const completed = receipts.filter(r => r.status === 'completed');
-  const todayReceipts = completed.filter(r => r.createdAt.startsWith(today));
-  const monthReceipts = completed.filter(r => r.createdAt.startsWith(thisMonth));
-
-  const sign = (r: Receipt) => (r.type === 'sale' ? 1 : -1);
-  const totalRevenue = completed.reduce((s, r) => s + sign(r) * r.total, 0);
-  const todayRevenue = todayReceipts.reduce((s, r) => s + sign(r) * r.total, 0);
-  const monthRevenue = monthReceipts.reduce((s, r) => s + sign(r) * r.total, 0);
-
-  // Stock alerts (tienda activa)
-  const overrideByTire = useMemo(() => {
-    const m = new Map<string, TireStoreOverride>();
-    overrides.forEach(o => m.set(o.tireId, o));
-    return m;
-  }, [overrides]);
-  const lowStockEntries = useMemo(() => {
-    const list: { id: string; brand: string; size: string; stock: number; min: number }[] = [];
-    for (const t of tires) {
-      const o = overrideByTire.get(t.id);
-      if (!o) continue;
-      if (o.stock <= o.lowStockThreshold) {
-        list.push({ id: t.id, brand: t.brand, size: t.size, stock: o.stock, min: o.lowStockThreshold });
-      }
-    }
-    return list;
-  }, [tires, overrideByTire]);
-  const outOfStockCount = lowStockEntries.filter(e => e.stock === 0).length;
-
-  // Active orders (legacy)
-  const activeOrders = orders.filter(o => !['entregado', 'cancelado'].includes(o.status));
-
-  // Top tires por revenue (líneas completadas)
-  const topTires = useMemo(() => {
-    const map: Record<string, { label: string; qty: number; revenue: number }> = {};
-    for (const l of lines) {
-      const key = l.tireId;
-      const sign = l.receiptType === 'sale' ? 1 : -1;
-      if (!map[key]) map[key] = { label: `${l.tireBrand} ${l.tireSize}`, qty: 0, revenue: 0 };
-      map[key].qty += sign * l.quantity;
-      map[key].revenue += sign * l.net;
-    }
-    return Object.values(map).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
-  }, [lines]);
-
-  // Payment method breakdown desde receipts.payments
-  const pmEntries = useMemo(() => {
-    const acc: Record<string, number> = {};
-    for (const r of completed) {
-      for (const p of r.payments) {
-        const sgn = r.type === 'sale' ? 1 : -1;
-        acc[p.paymentMethodId] = (acc[p.paymentMethodId] ?? 0) + sgn * p.amount;
-      }
-    }
-    return Object.entries(acc)
-      .map(([id, total]) => {
-        const pm = paymentMethods.find(p => p.id === id);
-        return { id, name: pm?.name ?? 'Desconocido', total };
-      })
-      .sort((a, b) => b.total - a.total);
-  }, [completed, paymentMethods]);
-
-  // Order status breakdown (legacy)
-  const orderBreakdown: Record<string, number> = {};
-  for (const o of orders) {
-    orderBreakdown[o.status] = (orderBreakdown[o.status] ?? 0) + 1;
+  // Sincroniza preset → inputs de fecha
+  function applyPreset(p: PeriodPreset) {
+    setPreset(p);
+    if (p === 'custom') return;
+    const r = rangeForPreset(p);
+    setFrom(isoToDateInput(r.from));
+    const endIso = new Date(new Date(r.to).getTime() - 86_400_000).toISOString();
+    setTo(isoToDateInput(endIso));
   }
 
-  const totalDebt = customers.reduce((s, c) => s + Math.max(0, c.accountBalance), 0);
-  const wholesaleCount = customers.filter(c => c.customerType === 'wholesale').length;
+  const filters = useMemo<ReportFilters>(() => ({
+    from: dateInputToIso(from),
+    to:   dateInputToIso(to, true),
+    storeId: filterStoreId || null,
+    employeeId: filterEmployeeId || null,
+  }), [from, to, filterStoreId, filterEmployeeId]);
 
-  const Stat = ({ label, value, sub, color, Icon }: { label: string; value: string; sub?: string; color?: string; Icon: React.ElementType }) => (
-    <div className="rounded-xl p-4" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--br-txt2)' }}>{label}</p>
-        <Icon className="h-4 w-4" style={{ color: color ?? 'var(--br-txt2)' }} />
-      </div>
-      <p className="text-2xl font-bold font-mono" style={{ color: color ?? 'var(--br-txt)' }}>{value}</p>
-      {sub && <p className="text-xs mt-1" style={{ color: 'var(--br-txt2)' }}>{sub}</p>}
-    </div>
-  );
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [
+        summary, items, categories, employeesR,
+        payments, receipts, discounts, taxes, cash,
+      ] = await Promise.all([
+        reportService.salesSummary(filters),
+        reportService.salesByItem(filters),
+        reportService.salesByCategory(filters),
+        reportService.salesByEmployee(filters),
+        reportService.salesByPayment(filters),
+        reportService.receipts(filters, 500),
+        reportService.discounts(filters),
+        reportService.salesByTax(filters),
+        reportService.cashSessions(filters),
+      ]);
+      setData({ summary, items, categories, employees: employeesR, payments, receipts, discounts, taxes, cash });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error cargando informes');
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  function exportCurrentTab() {
+    const periodTag = `${from}_${to}`;
+    switch (tab) {
+      case 'summary':
+        if (!data.summary) return;
+        downloadCsv(`resumen-${periodTag}.csv`, rowsToCsv(
+          [data.summary],
+          [
+            { header: 'Ventas brutas', value: r => r.grossSales },
+            { header: 'Reembolsos',    value: r => r.refunds },
+            { header: 'Descuentos',    value: r => r.discounts },
+            { header: 'Ventas netas',  value: r => r.netSales },
+            { header: 'Impuestos',     value: r => r.taxes },
+            { header: 'Total',         value: r => r.total },
+            { header: 'COGS',          value: r => r.cogs },
+            { header: 'Beneficio',     value: r => r.grossProfit },
+            { header: 'Recibos',       value: r => r.receiptCount },
+            { header: 'Reembolsos #',  value: r => r.refundCount },
+          ],
+        ));
+        return;
+      case 'items':
+        downloadCsv(`articulos-${periodTag}.csv`, rowsToCsv(data.items, ITEM_COLUMNS));
+        return;
+      case 'categories':
+        downloadCsv(`categorias-${periodTag}.csv`, rowsToCsv(data.categories, CATEGORY_COLUMNS));
+        return;
+      case 'employees':
+        downloadCsv(`empleados-${periodTag}.csv`, rowsToCsv(data.employees, EMPLOYEE_COLUMNS));
+        return;
+      case 'payments':
+        downloadCsv(`pagos-${periodTag}.csv`, rowsToCsv(data.payments, PAYMENT_COLUMNS));
+        return;
+      case 'receipts':
+        downloadCsv(`recibos-${periodTag}.csv`, rowsToCsv(data.receipts, RECEIPT_COLUMNS));
+        return;
+      case 'discounts':
+        downloadCsv(`descuentos-${periodTag}.csv`, rowsToCsv(data.discounts, DISCOUNT_COLUMNS));
+        return;
+      case 'taxes':
+        downloadCsv(`impuestos-${periodTag}.csv`, rowsToCsv(data.taxes, TAX_COLUMNS));
+        return;
+      case 'cash':
+        downloadCsv(`caja-${periodTag}.csv`, rowsToCsv(data.cash, CASH_COLUMNS));
+        return;
+    }
+  }
 
   return (
     <div className="p-5 max-w-6xl mx-auto">
-      <div className="mb-5">
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Análisis y Métricas</h1>
-        <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
-          {new Date().toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
+      <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
+        <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Informes</h1>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => void refresh()}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold disabled:opacity-50"
+            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}
+            title="Recargar"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Recargar
+          </button>
+          <button
+            onClick={exportCurrentTab}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white"
+            style={{ background: 'var(--br-amb)' }}
+          >
+            <Download className="h-4 w-4" /> Exportar CSV
+          </button>
+        </div>
       </div>
+
+      {/* Filters */}
+      <div className="rounded-xl p-4 mb-4 grid gap-3" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
+        <div className="flex flex-wrap gap-2">
+          {PRESETS.map(p => (
+            <button
+              key={p.id}
+              onClick={() => applyPreset(p.id)}
+              className="text-xs px-3 py-1.5 rounded-lg font-semibold"
+              style={{
+                background: preset === p.id ? 'var(--br-amb)' : 'var(--br-sur2)',
+                color: preset === p.id ? '#fff' : 'var(--br-txt2)',
+                border: '1px solid var(--br-bor)',
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Desde</label>
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: 'var(--br-txt2)' }} />
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => { setFrom(e.target.value); setPreset('custom'); }}
+                className="w-full pl-8 pr-2 py-2 rounded-lg text-sm outline-none"
+                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Hasta</label>
+            <div className="relative">
+              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: 'var(--br-txt2)' }} />
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => { setTo(e.target.value); setPreset('custom'); }}
+                className="w-full pl-8 pr-2 py-2 rounded-lg text-sm outline-none"
+                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Tienda</label>
+            <select
+              value={filterStoreId}
+              onChange={(e) => setFilterStoreId(e.target.value)}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+            >
+              <option value="">Todas</option>
+              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Empleado</label>
+            <select
+              value={filterEmployeeId}
+              onChange={(e) => setFilterEmployeeId(e.target.value)}
+              disabled={tab === 'employees' || tab === 'cash'}
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50"
+              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+            >
+              <option value="">Todos</option>
+              {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-4 overflow-x-auto" style={{ borderBottom: '1px solid var(--br-bor)' }}>
+        {TABS.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className="px-3 py-2 text-sm font-medium whitespace-nowrap"
+            style={{
+              color: tab === t.id ? 'var(--br-amb)' : 'var(--br-txt2)',
+              borderBottom: tab === t.id ? '2px solid var(--br-amb)' : '2px solid transparent',
+              marginBottom: '-1px',
+            }}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {error && (
+        <div className="rounded-lg p-3 mb-4 text-sm" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}>
+          {error}
+        </div>
+      )}
 
       {loading && (
-        <div className="rounded-xl p-4 mb-5 text-center text-sm"
-             style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>
-          Cargando métricas...
-        </div>
+        <p className="text-sm py-2" style={{ color: 'var(--br-txt2)' }}>Cargando…</p>
       )}
 
-      {/* Main stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        <Stat label="Ventas hoy" value={formatCurrency(todayRevenue)} sub={`${todayReceipts.length} recibos`} color="var(--br-amb)" Icon={TrendingUp} />
-        <Stat label="Ventas este mes" value={formatCurrency(monthRevenue)} sub={`${monthReceipts.length} recibos`} Icon={BarChart2} />
-        <Stat label="Total acumulado" value={formatCurrency(totalRevenue)} sub={`${completed.length} ventas`} Icon={ShoppingBag} />
-        <Stat label="Pedidos activos" value={String(activeOrders.length)} sub={`de ${orders.length} totales`} color={activeOrders.length > 0 ? 'var(--br-amb)' : undefined} Icon={Package} />
-      </div>
-
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <Stat label="Neumáticos" value={String(tires.length)} sub="en catálogo" Icon={Package} />
-        <Stat label="Stock bajo" value={String(lowStockEntries.length)} sub={`${outOfStockCount} sin stock`} color={lowStockEntries.length > 0 ? 'var(--br-red)' : undefined} Icon={AlertTriangle} />
-        <Stat label="Clientes" value={String(customers.length)} sub={`${wholesaleCount} mayoristas`} Icon={Users} />
-        <Stat label="Deuda clientes" value={formatCurrency(totalDebt)} sub="saldo deudor total" color="var(--br-red)" Icon={TrendingUp} />
-      </div>
-
-      <div className="grid lg:grid-cols-3 gap-4">
-        {/* Top tires */}
-        <div className="lg:col-span-1 rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-          <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--br-bor)', background: 'var(--br-sur2)' }}>
-            <p className="text-sm font-semibold" style={{ color: 'var(--br-txt)' }}>Top neumáticos vendidos</p>
-          </div>
-          {topTires.length === 0 ? (
-            <p className="text-sm text-center py-8" style={{ color: 'var(--br-txt2)' }}>Sin ventas registradas.</p>
-          ) : (
-            topTires.map((t, i) => (
-              <div key={i} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold w-5" style={{ color: 'var(--br-txt2)' }}>#{i + 1}</span>
-                  <div>
-                    <p className="text-sm font-medium" style={{ color: 'var(--br-txt)' }}>{t.label}</p>
-                    <p className="text-xs" style={{ color: 'var(--br-txt2)' }}>{t.qty} unidades</p>
-                  </div>
-                </div>
-                <span className="text-sm font-mono font-semibold" style={{ color: 'var(--br-amb)' }}>{formatCurrency(t.revenue)}</span>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Payment methods */}
-        <div className="rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-          <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--br-bor)', background: 'var(--br-sur2)' }}>
-            <p className="text-sm font-semibold" style={{ color: 'var(--br-txt)' }}>Métodos de pago</p>
-          </div>
-          {pmEntries.length === 0 ? (
-            <p className="text-sm text-center py-8" style={{ color: 'var(--br-txt2)' }}>Sin ventas.</p>
-          ) : (
-            pmEntries.map(pm => (
-              <div key={pm.id} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-                <p className="text-sm" style={{ color: 'var(--br-txt)' }}>{pm.name}</p>
-                <span className="text-sm font-mono font-semibold" style={{ color: 'var(--br-txt)' }}>{formatCurrency(pm.total)}</span>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Order statuses */}
-        <div className="rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-          <div className="px-4 py-3" style={{ borderBottom: '1px solid var(--br-bor)', background: 'var(--br-sur2)' }}>
-            <p className="text-sm font-semibold" style={{ color: 'var(--br-txt)' }}>Estado de pedidos</p>
-          </div>
-          {Object.entries(orderBreakdown).length === 0 ? (
-            <p className="text-sm text-center py-8" style={{ color: 'var(--br-txt2)' }}>Sin pedidos.</p>
-          ) : (
-            Object.entries(orderBreakdown).map(([status, count]) => (
-              <div key={status} className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-                <p className="text-sm" style={{ color: 'var(--br-txt)' }}>{STATUS_LABELS[status] ?? status}</p>
-                <span className="text-sm font-semibold font-mono" style={{ color: 'var(--br-txt)' }}>{count}</span>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Low stock alert */}
-      {lowStockEntries.length > 0 && (
-        <div className="mt-4 rounded-xl p-4" style={{ background: 'var(--br-red-bg)', border: '1px solid var(--br-red-bor)' }}>
-          <p className="text-sm font-semibold mb-2 flex items-center gap-2" style={{ color: 'var(--br-red)' }}>
-            <AlertTriangle className="h-4 w-4" /> Alertas de stock ({lowStockEntries.length})
-          </p>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2">
-            {lowStockEntries.slice(0, 9).map(t => (
-              <div key={t.id} className="flex justify-between text-xs rounded px-2 py-1.5" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-red-bor)' }}>
-                <span className="font-medium" style={{ color: 'var(--br-txt)' }}>{t.brand} {t.size}</span>
-                <span className="font-mono" style={{ color: t.stock === 0 ? 'var(--br-red)' : 'var(--br-amb)' }}>{t.stock}/{t.min}</span>
-              </div>
-            ))}
-          </div>
-          {lowStockEntries.length > 9 && <p className="text-xs mt-2" style={{ color: 'var(--br-red)' }}>+{lowStockEntries.length - 9} más en Inventario.</p>}
-        </div>
-      )}
+      {/* Content */}
+      {tab === 'summary'    && <SummaryPanel data={data.summary} />}
+      {tab === 'items'      && <SimpleTable rows={data.items} columns={ITEM_COLUMNS} empty="Sin ventas en el período." />}
+      {tab === 'categories' && <SimpleTable rows={data.categories} columns={CATEGORY_COLUMNS} empty="Sin ventas en el período." />}
+      {tab === 'employees'  && <SimpleTable rows={data.employees} columns={EMPLOYEE_COLUMNS} empty="Sin actividad de empleados." />}
+      {tab === 'payments'   && <SimpleTable rows={data.payments} columns={PAYMENT_COLUMNS} empty="Sin pagos registrados." />}
+      {tab === 'receipts'   && <SimpleTable rows={data.receipts} columns={RECEIPT_COLUMNS} empty="Sin recibos en el período." />}
+      {tab === 'discounts'  && <SimpleTable rows={data.discounts} columns={DISCOUNT_COLUMNS} empty="Sin descuentos aplicados." />}
+      {tab === 'taxes'      && <SimpleTable rows={data.taxes} columns={TAX_COLUMNS} empty="Sin impuestos aplicados." />}
+      {tab === 'cash'       && <SimpleTable rows={data.cash} columns={CASH_COLUMNS} empty="Sin sesiones de caja." />}
     </div>
   );
 }
+
+// ─── Summary panel ──────────────────────────────────────────────────
+
+function SummaryPanel({ data }: { data: SalesSummary | null }) {
+  if (!data) return null;
+  const Stat = ({ label, value, accent }: { label: string; value: string; accent?: boolean }) => (
+    <div className="rounded-xl p-4" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
+      <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>{label}</p>
+      <p className="text-2xl font-bold font-mono" style={{ color: accent ? 'var(--br-amb)' : 'var(--br-txt)' }}>{value}</p>
+    </div>
+  );
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <Stat label="Ventas brutas" value={formatCurrency(data.grossSales)} />
+      <Stat label="Reembolsos" value={formatCurrency(data.refunds)} />
+      <Stat label="Descuentos" value={formatCurrency(data.discounts)} />
+      <Stat label="Ventas netas" value={formatCurrency(data.netSales)} accent />
+      <Stat label="Impuestos" value={formatCurrency(data.taxes)} />
+      <Stat label="Total cobrado" value={formatCurrency(data.total)} accent />
+      <Stat label="Costo (COGS)" value={formatCurrency(data.cogs)} />
+      <Stat label="Beneficio bruto" value={formatCurrency(data.grossProfit)} accent />
+      <Stat label="Recibos" value={String(data.receiptCount)} />
+      <Stat label="Reembolsos #" value={String(data.refundCount)} />
+    </div>
+  );
+}
+
+// ─── Generic table ──────────────────────────────────────────────────
+
+function SimpleTable<T>({ rows, columns, empty }: { rows: T[]; columns: CsvColumn<T>[]; empty: string }) {
+  if (rows.length === 0) {
+    return <p className="text-sm py-8 text-center" style={{ color: 'var(--br-txt2)' }}>{empty}</p>;
+  }
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead style={{ background: 'var(--br-sur2)' }}>
+            <tr>
+              {columns.map(c => (
+                <th key={c.header} className="text-left px-3 py-2 font-semibold text-xs uppercase tracking-wide" style={{ color: 'var(--br-txt2)' }}>
+                  {c.header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={i} style={{ borderTop: '1px solid var(--br-bor)' }}>
+                {columns.map(c => (
+                  <td key={c.header} className="px-3 py-2" style={{ color: 'var(--br-txt)' }}>
+                    {String(c.value(r) ?? '')}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ─── Columnas (compartidas con CSV export) ──────────────────────────
+
+const fmt = (n: unknown) => typeof n === 'number' ? formatCurrency(n) : String(n ?? '');
+const fmtQty = (n: unknown) => typeof n === 'number' ? n.toLocaleString('es-AR') : String(n ?? '');
+
+const ITEM_COLUMNS: CsvColumn<SalesByItem>[] = [
+  { header: 'Marca',       value: r => r.tireBrand },
+  { header: 'Modelo',      value: r => r.tireModel },
+  { header: 'Medida',      value: r => r.tireSize },
+  { header: 'Cantidad',    value: r => fmtQty(r.quantity) },
+  { header: 'Ventas netas',value: r => fmt(r.netSales) },
+  { header: 'COGS',        value: r => fmt(r.cogs) },
+  { header: 'Beneficio',   value: r => fmt(r.profit) },
+];
+
+const CATEGORY_COLUMNS: CsvColumn<SalesByCategory>[] = [
+  { header: 'Categoría',   value: r => r.categoryName },
+  { header: 'Cantidad',    value: r => fmtQty(r.quantity) },
+  { header: 'Ventas netas',value: r => fmt(r.netSales) },
+  { header: 'COGS',        value: r => fmt(r.cogs) },
+  { header: 'Beneficio',   value: r => fmt(r.profit) },
+];
+
+const EMPLOYEE_COLUMNS: CsvColumn<SalesByEmployee>[] = [
+  { header: 'Empleado',    value: r => r.employeeName },
+  { header: 'Recibos',     value: r => r.receiptCount },
+  { header: 'Reembolsos',  value: r => r.refundCount },
+  { header: 'Ventas netas',value: r => fmt(r.netSales) },
+  { header: 'Total',       value: r => fmt(r.total) },
+  { header: 'Beneficio',   value: r => fmt(r.profit) },
+];
+
+const PAYMENT_COLUMNS: CsvColumn<SalesByPayment>[] = [
+  { header: 'Método',      value: r => r.paymentMethodName },
+  { header: 'Recibos',     value: r => r.receiptCount },
+  { header: 'Total',       value: r => fmt(r.total) },
+];
+
+const RECEIPT_COLUMNS: CsvColumn<ReceiptReportRow>[] = [
+  { header: 'Fecha',       value: r => new Date(r.createdAt).toLocaleString('es-AR') },
+  { header: 'Recibo',      value: r => r.receiptNumber },
+  { header: 'Tipo',        value: r => r.type === 'sale' ? 'Venta' : 'Reembolso' },
+  { header: 'Tienda',      value: r => r.storeName },
+  { header: 'Empleado',    value: r => r.employeeName },
+  { header: 'Cliente',     value: r => r.customerName ?? '' },
+  { header: 'Items',       value: r => fmtQty(r.itemCount) },
+  { header: 'Descuentos',  value: r => fmt(r.totalDiscounts) },
+  { header: 'Impuestos',   value: r => fmt(r.totalTaxes) },
+  { header: 'Total',       value: r => fmt(r.total) },
+];
+
+const DISCOUNT_COLUMNS: CsvColumn<DiscountReportRow>[] = [
+  { header: 'Descuento',   value: r => r.discountName },
+  { header: 'Aplicaciones',value: r => r.applyCount },
+  { header: 'Total',       value: r => fmt(r.amount) },
+];
+
+const TAX_COLUMNS: CsvColumn<SalesByTax>[] = [
+  { header: 'Impuesto',    value: r => r.taxName },
+  { header: 'Tasa',        value: r => `${r.rate}%` },
+  { header: 'Base imponible', value: r => fmt(r.base) },
+  { header: 'Importe',     value: r => fmt(r.amount) },
+];
+
+const CASH_COLUMNS: CsvColumn<CashSessionReportRow>[] = [
+  { header: 'Apertura',    value: r => new Date(r.openedAt).toLocaleString('es-AR') },
+  { header: 'Cierre',      value: r => r.closedAt ? new Date(r.closedAt).toLocaleString('es-AR') : '—' },
+  { header: 'Tienda',      value: r => r.storeName },
+  { header: 'Abrió',       value: r => r.openedByName ?? '' },
+  { header: 'Cerró',       value: r => r.closedByName ?? '' },
+  { header: 'Estado',      value: r => r.status === 'open' ? 'Abierta' : 'Cerrada' },
+  { header: 'Fondo',       value: r => fmt(r.openingFloat) },
+  { header: 'Ventas',      value: r => fmt(r.totalSales) },
+  { header: 'Reembolsos',  value: r => fmt(r.totalRefunds) },
+  { header: 'Recibos',     value: r => r.receiptCount },
+  { header: 'Pay-in',      value: r => fmt(r.payIn) },
+  { header: 'Pay-out',     value: r => fmt(r.payOut) },
+  { header: 'Esperado',    value: r => r.expectedCash !== null ? fmt(r.expectedCash) : '—' },
+  { header: 'Contado',     value: r => r.countedCash !== null ? fmt(r.countedCash) : '—' },
+  { header: 'Descuadre',   value: r => r.variance !== null ? fmt(r.variance) : '—' },
+];
