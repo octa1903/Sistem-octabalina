@@ -1,14 +1,16 @@
-import { useState } from 'react';
-import type { EmployeeTab, CashSession } from '@/types';
+import { useEffect, useMemo, useState } from 'react';
+import type { EmployeeTab, CashSession, Permission } from '@/types';
 import type { useAuth } from '@/hooks/useAuth';
 import { Toast, useToast } from '@/components/ui/Toast';
 import { Spinner } from '@/components/ui/Spinner';
 import {
   ShoppingCart, Package, Users, CreditCard,
-  FileText, ClipboardList, BarChart2, Settings, LogOut,
+  FileText, ClipboardList, BarChart2, Settings, LogOut, UserCog,
 } from 'lucide-react';
 import { useStores } from '@/hooks/useStores';
 import { useCashSession } from '@/hooks/useCashSession';
+import { useCurrentEmployee } from '@/hooks/useCurrentEmployee';
+import { hasPermission } from '@/services/roleService';
 import { InventoryView } from './InventoryView';
 import { POSView } from './POSView';
 import { ClientsView } from './ClientsView';
@@ -20,19 +22,28 @@ import { SettingsView } from './SettingsView';
 import { TopBar } from './TopBar';
 import { OpenCashModal } from './cash/OpenCashModal';
 import { CloseCashModal } from './cash/CloseCashModal';
+import { EmployeeSelector } from './EmployeeSelector';
 
 type AuthReturn = ReturnType<typeof useAuth>;
 interface Props { auth: AuthReturn; }
 
-const NAV_ITEMS: { id: EmployeeTab; label: string; Icon: React.ElementType }[] = [
-  { id: 'pos',       label: 'Ventas',     Icon: ShoppingCart },
-  { id: 'inventory', label: 'Inventario', Icon: Package },
-  { id: 'clients',   label: 'Clientes',   Icon: Users },
-  { id: 'accounts',  label: 'Cuentas',    Icon: CreditCard },
-  { id: 'invoices',  label: 'Facturas',   Icon: FileText },
-  { id: 'orders',    label: 'Pedidos',    Icon: ClipboardList },
-  { id: 'analytics', label: 'Análisis',   Icon: BarChart2 },
-  { id: 'settings',  label: 'Config.',    Icon: Settings },
+interface NavItem {
+  id: EmployeeTab;
+  label: string;
+  Icon: React.ElementType;
+  /** Permission requerido para ver este tab. `null` = visible para cualquier operador autenticado. */
+  requires: Permission | null;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { id: 'pos',       label: 'Ventas',     Icon: ShoppingCart,   requires: 'pos.sell' },
+  { id: 'inventory', label: 'Inventario', Icon: Package,        requires: 'tires.view' },
+  { id: 'clients',   label: 'Clientes',   Icon: Users,          requires: 'customers.view' },
+  { id: 'accounts',  label: 'Cuentas',    Icon: CreditCard,     requires: 'customers.view' },
+  { id: 'invoices',  label: 'Facturas',   Icon: FileText,       requires: 'backoffice.access' },
+  { id: 'orders',    label: 'Pedidos',    Icon: ClipboardList,  requires: 'backoffice.access' },
+  { id: 'analytics', label: 'Análisis',   Icon: BarChart2,      requires: 'reports.view' },
+  { id: 'settings',  label: 'Config.',    Icon: Settings,       requires: 'settings.manage' },
 ];
 
 export function EmployeeApp({ auth }: Props) {
@@ -42,9 +53,24 @@ export function EmployeeApp({ auth }: Props) {
   const { toasts, addToast, removeToast } = useToast();
 
   const stores = useStores(auth.isAuthenticated);
-  const cash = useCashSession(stores.activeStoreId, auth.employeeId ?? null);
+  const current = useCurrentEmployee();
+  const operatorId = current.employee?.id ?? auth.employeeId ?? null;
+  const operatorName = current.employee?.name ?? auth.employeeName;
+  const cash = useCashSession(stores.activeStoreId, operatorId);
 
   const activeStoreName = stores.activeStore?.name ?? 'Sin tienda';
+
+  const visibleNavItems = useMemo(
+    () => NAV_ITEMS.filter(n => n.requires === null || hasPermission(current.employee?.role ?? null, n.requires)),
+    [current.employee],
+  );
+
+  // Si el tab activo no es visible para el operador actual, fallback al primero disponible.
+  useEffect(() => {
+    if (visibleNavItems.length > 0 && !visibleNavItems.some(n => n.id === tab)) {
+      setTab(visibleNavItems[0].id);
+    }
+  }, [visibleNavItems, tab]);
 
   async function handleOpenCash(amount: number) {
     try {
@@ -84,13 +110,17 @@ export function EmployeeApp({ auth }: Props) {
           </div>
           <div className="hidden lg:block overflow-hidden">
             <p className="text-sm font-semibold text-white truncate leading-tight">Baliña Ruedas</p>
-            <p className="text-xs truncate" style={{ color: '#9a9590' }}>{auth.employeeName ?? 'Empleado'}</p>
+            <p className="text-xs truncate" style={{ color: '#9a9590' }}>
+              {current.employee
+                ? `${current.employee.name}${current.employee.role ? ` · ${current.employee.role.name}` : ''}`
+                : auth.employeeName ?? 'Empleado'}
+            </p>
           </div>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 py-3 overflow-y-auto">
-          {NAV_ITEMS.map(({ id, label, Icon }) => (
+          {visibleNavItems.map(({ id, label, Icon }) => (
             <button
               key={id}
               onClick={() => setTab(id)}
@@ -107,10 +137,23 @@ export function EmployeeApp({ auth }: Props) {
           ))}
         </nav>
 
-        {/* Logout */}
-        <div className="p-3" style={{ borderTop: '1px solid #2a2520' }}>
+        {/* Switch operator + Logout */}
+        <div className="p-3 space-y-1" style={{ borderTop: '1px solid #2a2520' }}>
+          {current.employee && (
+            <button
+              onClick={current.logout}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors"
+              style={{ color: '#9a9590' }}
+              onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
+              onMouseOut={(e) => (e.currentTarget.style.color = '#9a9590')}
+              title="Cambiar operador (no cierra sesión web)"
+            >
+              <UserCog className="h-5 w-5 flex-shrink-0" />
+              <span className="hidden lg:block text-sm">Cambiar operador</span>
+            </button>
+          )}
           <button
-            onClick={auth.logout}
+            onClick={() => { current.logout(); auth.logout(); }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors"
             style={{ color: '#9a9590' }}
             onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
@@ -132,7 +175,9 @@ export function EmployeeApp({ auth }: Props) {
           cashLoading={cash.loading || stores.loading}
           onOpenCash={() => setOpenCashOpen(true)}
           onCloseCash={() => { if (cash.session) setClosingSession(cash.session); }}
-          employeeName={auth.employeeName}
+          employeeName={operatorName}
+          canOpenCash={hasPermission(current.employee?.role ?? null, 'pos.openCash')}
+          canCloseCash={hasPermission(current.employee?.role ?? null, 'pos.closeCash')}
         />
 
         <main className="flex-1 overflow-y-auto">
@@ -155,14 +200,14 @@ export function EmployeeApp({ auth }: Props) {
             </div>
           ) : (
             <>
-              {tab === 'pos'       && <POSView       addToast={addToast} storeId={stores.activeStoreId} cashSession={cash.session} employeeId={auth.employeeId ?? null} employeeName={auth.employeeName} />}
+              {tab === 'pos'       && <POSView       addToast={addToast} storeId={stores.activeStoreId} cashSession={cash.session} employeeId={operatorId} employeeName={operatorName} />}
               {tab === 'inventory' && <InventoryView addToast={addToast} activeStoreId={stores.activeStoreId} />}
               {tab === 'clients'   && <ClientsView   addToast={addToast} />}
-              {tab === 'accounts'  && <AccountsView  addToast={addToast} employeeId={auth.employeeId ?? null} />}
+              {tab === 'accounts'  && <AccountsView  addToast={addToast} employeeId={operatorId} />}
               {tab === 'invoices'  && <InvoicesView  addToast={addToast} />}
               {tab === 'orders'    && <OrdersView    addToast={addToast} />}
               {tab === 'analytics' && <AnalyticsView storeId={stores.activeStoreId} />}
-              {tab === 'settings'  && <SettingsView  auth={auth} addToast={addToast} activeStoreId={stores.activeStoreId} activeStoreName={stores.activeStore?.name} />}
+              {tab === 'settings'  && <SettingsView  auth={auth} addToast={addToast} activeStoreId={stores.activeStoreId} activeStoreName={stores.activeStore?.name} currentRole={current.employee?.role ?? null} />}
             </>
           )}
         </main>
@@ -182,6 +227,16 @@ export function EmployeeApp({ auth }: Props) {
           storeName={activeStoreName}
           onClose={() => setClosingSession(null)}
           onConfirm={handleCloseCash}
+        />
+      )}
+
+      {/* Selector de operador: bloquea la UI hasta que el cajero ingrese su PIN.
+          Solo visible si: hay tienda activa, no estamos cargando, y no hay operador. */}
+      {!current.loading && !current.employee && stores.activeStoreId && (
+        <EmployeeSelector
+          storeId={stores.activeStoreId}
+          loginWithPin={current.loginWithPin}
+          onSelected={() => addToast('Operador identificado.', 'success')}
         />
       )}
 

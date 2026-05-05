@@ -11,6 +11,8 @@ interface Props {
   onOpenCash: () => void;
   onCloseCash: () => void;
   employeeName?: string;
+  canOpenCash: boolean;
+  canCloseCash: boolean;
 }
 
 export function TopBar({
@@ -22,6 +24,8 @@ export function TopBar({
   onOpenCash,
   onCloseCash,
   employeeName,
+  canOpenCash,
+  canCloseCash,
 }: Props) {
   const activeStore = stores.find(s => s.id === activeStoreId);
 
@@ -68,15 +72,17 @@ export function TopBar({
               <LockOpen className="h-3 w-3" />
               Caja abierta · {formatCurrency(session.openingFloat)}
             </span>
-            <button
-              type="button"
-              onClick={onCloseCash}
-              disabled={!activeStoreId}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
-              style={{ background: 'var(--br-red)' }}
-            >
-              Cerrar caja
-            </button>
+            {canCloseCash && (
+              <button
+                type="button"
+                onClick={onCloseCash}
+                disabled={!activeStoreId}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
+                style={{ background: 'var(--br-red)' }}
+              >
+                Cerrar caja
+              </button>
+            )}
           </>
         ) : (
           <>
@@ -87,15 +93,17 @@ export function TopBar({
               <Lock className="h-3 w-3" />
               Caja cerrada
             </span>
-            <button
-              type="button"
-              onClick={onOpenCash}
-              disabled={!activeStoreId}
-              className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
-              style={{ background: '#15803d' }}
-            >
-              Abrir caja
-            </button>
+            {canOpenCash && (
+              <button
+                type="button"
+                onClick={onOpenCash}
+                disabled={!activeStoreId}
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
+                style={{ background: '#15803d' }}
+              >
+                Abrir caja
+              </button>
+            )}
           </>
         )}
       </div>

@@ -5,6 +5,9 @@ import { configService, backupService } from '@/services/storageService';
 import { Modal } from '@/components/ui/Modal';
 import { TaxesSection } from './settings/TaxesSection';
 import { ReceiptConfigSection } from './settings/ReceiptConfigSection';
+import { EmployeesSection } from './settings/EmployeesSection';
+import { hasPermission } from '@/services/roleService';
+import type { Role } from '@/types';
 import { Key, Download, Upload, ToggleLeft, ToggleRight } from 'lucide-react';
 
 type AuthReturn = ReturnType<typeof useAuth>;
@@ -13,11 +16,14 @@ interface Props {
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
   activeStoreId?: string | null;
   activeStoreName?: string;
+  /** Rol del operador actual del TPV (para permission gates en secciones admin). */
+  currentRole?: Role | null;
 }
 
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
-export function SettingsView({ auth, addToast, activeStoreId, activeStoreName }: Props) {
+export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, currentRole }: Props) {
+  const canManageEmployees = hasPermission(currentRole ?? null, 'employees.manage');
   const [orderConfig, setOrderConfig] = useState<OrderConfig>(() => configService.getOrderConfig());
   const [wholesaleConfig, setWholesaleConfig] = useState<WholesaleConfig>(() => configService.getWholesaleConfig());
   const [pwdOpen, setPwdOpen] = useState(false);
@@ -122,6 +128,9 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName }:
         storeName={activeStoreName ?? 'Tienda'}
         addToast={addToast}
       />
+
+      {/* Empleados (solo con employees.manage) */}
+      {canManageEmployees && <EmployeesSection addToast={addToast} />}
 
       {/* Security */}
       <Section title="Seguridad">
