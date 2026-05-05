@@ -46,11 +46,14 @@ export function rangeForPreset(preset: PeriodPreset, ref: Date = new Date()): Da
   }
 }
 
-/** "YYYY-MM-DD" → ISO al inicio del día local. */
+/** "YYYY-MM-DD" → ISO al inicio del día local. Si el input es inválido, cae a hoy. */
 export function dateInputToIso(input: string, endOfDay = false): string {
-  const [y, m, d] = input.split('-').map(Number);
-  const dt = new Date(y, (m ?? 1) - 1, d ?? 1, 0, 0, 0, 0);
-  if (endOfDay) dt.setDate(dt.getDate() + 1); // fin exclusivo
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input);
+  const fallback = new Date();
+  const dt = m
+    ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0)
+    : new Date(fallback.getFullYear(), fallback.getMonth(), fallback.getDate(), 0, 0, 0, 0);
+  if (endOfDay) dt.setDate(dt.getDate() + 1);
   return dt.toISOString();
 }
 
@@ -63,11 +66,15 @@ export function isoToDateInput(iso: string): string {
   return `${yyyy}-${mm}-${dd}`;
 }
 
-/** Escapea un valor para CSV (RFC 4180). */
+/**
+ * Escapea un valor para CSV (RFC 4180) + protege contra CSV injection en Excel.
+ * Si el campo empieza con uno de los caracteres "fórmula" (=,+,-,@,\t,\r),
+ * lo prefijamos con apóstrofo para que Excel/LibreOffice lo trate como texto.
+ */
 export function csvEscape(v: unknown): string {
   if (v === null || v === undefined) return '';
-  const s = typeof v === 'string' ? v : typeof v === 'number' ? String(v) : String(v);
-  // Si tiene coma, comilla o salto de línea — envolver y escapar comillas.
+  let s = typeof v === 'string' ? v : typeof v === 'number' ? String(v) : String(v);
+  if (s.length > 0 && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
   if (/[",\n\r]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
@@ -85,13 +92,15 @@ export function rowsToCsv<T>(rows: T[], columns: CsvColumn<T>[]): string {
   return '﻿' + [head, ...body].join('\r\n');
 }
 
-/** Dispara descarga del CSV. */
+/** Dispara descarga del CSV. Revocamos el ObjectURL con delay para que Firefox alcance a iniciar la descarga. */
 export function downloadCsv(filename: string, csv: string): void {
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
   a.download = filename;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

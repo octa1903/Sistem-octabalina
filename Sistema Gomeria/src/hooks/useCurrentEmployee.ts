@@ -78,13 +78,14 @@ export function useCurrentEmployee() {
   /** Valida PIN contra `employees.pin_hash` y, si coincide, abre sesión de operador. */
   const loginWithPin = useCallback(
     async (employeeId: string, pin: string): Promise<{ ok: true } | { ok: false; reason: string }> => {
+      // Mensaje genérico para evitar enumeración (no revelar si el empleado
+      // existe / está activo / tiene PIN antes de verificar el PIN ingresado).
+      const GENERIC = 'Credenciales incorrectas.';
       try {
         const emp = await employeeService.getWithRole(employeeId);
-        if (!emp) return { ok: false, reason: 'Empleado no encontrado.' };
-        if (!emp.active) return { ok: false, reason: 'Empleado inactivo.' };
-        if (!emp.pinHash) return { ok: false, reason: 'Empleado sin PIN configurado.' };
+        if (!emp || !emp.active || !emp.pinHash) return { ok: false, reason: GENERIC };
         const valid = await verifyPin(pin, emp.pinHash);
-        if (!valid) return { ok: false, reason: 'PIN incorrecto.' };
+        if (!valid) return { ok: false, reason: GENERIC };
         const expiresAt = Date.now() + SESSION_TIMEOUT;
         storageSet<PersistedSession>(STORAGE_KEY, { employeeId: emp.id, expiresAt });
         setState({ employee: emp, loading: false, error: null });

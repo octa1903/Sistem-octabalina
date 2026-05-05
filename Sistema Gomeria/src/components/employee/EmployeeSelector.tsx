@@ -4,7 +4,7 @@
 // identificar al cajero que va a operar el TPV (PIN 4 dígitos).
 // ═══════════════════════════════════════════════════
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { Employee } from '@/types';
 import { employeeService } from '@/services/employeeService';
 import { LogIn, User } from 'lucide-react';
@@ -22,6 +22,8 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
   const [selectedId, setSelectedId] = useState('');
   const [pin, setPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const mountedRef = useRef(true);
+  useEffect(() => () => { mountedRef.current = false; }, []);
 
   useEffect(() => {
     let active = true;
@@ -43,6 +45,7 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
     setSubmitting(true);
     setError(null);
     const r = await loginWithPin(selectedId, pin);
+    if (!mountedRef.current) return;
     setSubmitting(false);
     if (!r.ok) {
       setError(r.reason);

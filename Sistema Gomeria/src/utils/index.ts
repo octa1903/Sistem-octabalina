@@ -1,5 +1,5 @@
 export { cn } from './cn';
-export { sha256, sha256Sync, verifyPin } from './hash';
+export { sha256, verifyPin } from './hash';
 export {
   formatCurrency,
   formatDecimal,

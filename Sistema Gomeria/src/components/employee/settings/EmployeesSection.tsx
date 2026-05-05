@@ -139,7 +139,10 @@ export function EmployeesSection({ addToast }: Props) {
 
     setSubmitting(true);
     try {
-      const pinHash = wantsPinChange ? await sha256(form.pin) : editing!.pinHash;
+      // wantsPinChange === false implica editing !== null (es la única rama
+      // donde se permite no enviar PIN), por eso este fallback es seguro.
+      const existingHash = editing?.pinHash ?? '';
+      const pinHash = wantsPinChange ? await sha256(form.pin) : existingHash;
       await employeeService.save({
         id: editing?.id,
         name: form.name.trim(),

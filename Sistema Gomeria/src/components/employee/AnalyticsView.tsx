@@ -344,14 +344,14 @@ export function AnalyticsView({ storeId }: Props) {
 
       {/* Content */}
       {tab === 'summary'    && <SummaryPanel data={data.summary} />}
-      {tab === 'items'      && <SimpleTable rows={data.items} columns={ITEM_COLUMNS} empty="Sin ventas en el período." />}
-      {tab === 'categories' && <SimpleTable rows={data.categories} columns={CATEGORY_COLUMNS} empty="Sin ventas en el período." />}
-      {tab === 'employees'  && <SimpleTable rows={data.employees} columns={EMPLOYEE_COLUMNS} empty="Sin actividad de empleados." />}
-      {tab === 'payments'   && <SimpleTable rows={data.payments} columns={PAYMENT_COLUMNS} empty="Sin pagos registrados." />}
-      {tab === 'receipts'   && <SimpleTable rows={data.receipts} columns={RECEIPT_COLUMNS} empty="Sin recibos en el período." />}
-      {tab === 'discounts'  && <SimpleTable rows={data.discounts} columns={DISCOUNT_COLUMNS} empty="Sin descuentos aplicados." />}
-      {tab === 'taxes'      && <SimpleTable rows={data.taxes} columns={TAX_COLUMNS} empty="Sin impuestos aplicados." />}
-      {tab === 'cash'       && <SimpleTable rows={data.cash} columns={CASH_COLUMNS} empty="Sin sesiones de caja." />}
+      {tab === 'items'      && <SimpleTable rows={data.items}      columns={ITEM_COLUMNS}     empty="Sin ventas en el período."     rowKey={r => r.tireId} />}
+      {tab === 'categories' && <SimpleTable rows={data.categories} columns={CATEGORY_COLUMNS} empty="Sin ventas en el período."     rowKey={r => r.categoryId} />}
+      {tab === 'employees'  && <SimpleTable rows={data.employees}  columns={EMPLOYEE_COLUMNS} empty="Sin actividad de empleados."   rowKey={r => r.employeeId} />}
+      {tab === 'payments'   && <SimpleTable rows={data.payments}   columns={PAYMENT_COLUMNS}  empty="Sin pagos registrados."        rowKey={r => r.paymentMethodId} />}
+      {tab === 'receipts'   && <SimpleTable rows={data.receipts}   columns={RECEIPT_COLUMNS}  empty="Sin recibos en el período."    rowKey={r => r.id} />}
+      {tab === 'discounts'  && <SimpleTable rows={data.discounts}  columns={DISCOUNT_COLUMNS} empty="Sin descuentos aplicados."     rowKey={r => r.discountId} />}
+      {tab === 'taxes'      && <SimpleTable rows={data.taxes}      columns={TAX_COLUMNS}      empty="Sin impuestos aplicados."      rowKey={r => r.taxId} />}
+      {tab === 'cash'       && <SimpleTable rows={data.cash}       columns={CASH_COLUMNS}     empty="Sin sesiones de caja."         rowKey={r => r.id} />}
     </div>
   );
 }
@@ -384,7 +384,12 @@ function SummaryPanel({ data }: { data: SalesSummary | null }) {
 
 // ─── Generic table ──────────────────────────────────────────────────
 
-function SimpleTable<T>({ rows, columns, empty }: { rows: T[]; columns: CsvColumn<T>[]; empty: string }) {
+function SimpleTable<T>({ rows, columns, empty, rowKey }: {
+  rows: T[];
+  columns: CsvColumn<T>[];
+  empty: string;
+  rowKey: (r: T, i: number) => string;
+}) {
   if (rows.length === 0) {
     return <p className="text-sm py-8 text-center" style={{ color: 'var(--br-txt2)' }}>{empty}</p>;
   }
@@ -403,7 +408,7 @@ function SimpleTable<T>({ rows, columns, empty }: { rows: T[]; columns: CsvColum
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} style={{ borderTop: '1px solid var(--br-bor)' }}>
+              <tr key={rowKey(r, i)} style={{ borderTop: '1px solid var(--br-bor)' }}>
                 {columns.map(c => (
                   <td key={c.header} className="px-3 py-2" style={{ color: 'var(--br-txt)' }}>
                     {String(c.value(r) ?? '')}

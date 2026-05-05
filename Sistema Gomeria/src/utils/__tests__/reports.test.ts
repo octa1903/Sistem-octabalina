@@ -14,6 +14,13 @@ describe('csvEscape', () => {
     expect(csvEscape(null)).toBe('');
     expect(csvEscape(undefined)).toBe('');
   });
+
+  it('previene CSV injection prefijando con apóstrofo', () => {
+    expect(csvEscape('=HYPERLINK("evil","x")')).toBe('"\'=HYPERLINK(""evil"",""x"")"');
+    expect(csvEscape('+SUM(A1)')).toBe("'+SUM(A1)");
+    expect(csvEscape('-1+1')).toBe("'-1+1");
+    expect(csvEscape('@cmd')).toBe("'@cmd");
+  });
 });
 
 describe('rowsToCsv', () => {

@@ -15,21 +15,6 @@ export async function sha256(text: string): Promise<string> {
 }
 
 /**
- * Versión síncrona para compatibilidad con código que no puede ser async.
- * ⚠️ Preferir sha256() cuando sea posible.
- */
-export function sha256Sync(text: string): string {
-  // Fallback simple — en producción usar SubtleCrypto
-  let hash = 0;
-  for (let i = 0; i < text.length; i++) {
-    const char = text.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(16).padStart(64, '0');
-}
-
-/**
  * Verifica un PIN contra su hash almacenado.
  */
 export async function verifyPin(pin: string, storedHash: string): Promise<boolean> {
