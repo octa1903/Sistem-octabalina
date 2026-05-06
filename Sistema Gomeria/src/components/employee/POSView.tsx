@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type {
   TireV2, TireStoreOverride, Category, Customer, PaymentMethod, CashSession, Tax, Store, ReceiptConfig,
-  Receipt, ReceiptLine,
+  Receipt, ReceiptLine, Discount,
   BuildReceiptInput, LoyaltyConfig,
 } from '@/types';
 import { tireServiceV2 } from '@/services/tireServiceV2';
@@ -9,14 +9,17 @@ import { categoryService } from '@/services/categoryService';
 import { customerServiceV2 } from '@/services/customerServiceV2';
 import { receiptService } from '@/services/receiptService';
 import { taxService } from '@/services/taxService';
+import { discountService } from '@/services/discountService';
 import { storeService } from '@/services/storeService';
 import { receiptConfigService } from '@/services/receiptConfigService';
+import { useCurrentEmployee } from '@/hooks/useCurrentEmployee';
+import { hasPermission } from '@/services/roleService';
 import { supabase } from '@/services/supabaseClient';
 import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
 import { printReceipt } from '@/utils/printReceipt';
 import { Modal } from '@/components/ui/Modal';
-import { Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle, Lock, Printer, Bookmark, Inbox } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle, Lock, Printer, Bookmark, Inbox, Tag } from 'lucide-react';
 
 interface Props {
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
@@ -56,12 +59,16 @@ async function nextReceiptNumber(storeId: string): Promise<string> {
 }
 
 export function POSView({ addToast, storeId, cashSession, employeeId, employeeName }: Props) {
+  const current = useCurrentEmployee();
+  const canDiscount = hasPermission(current.employee?.role ?? null, 'pos.discount');
+
   const [tires, setTires] = useState<TireV2[]>([]);
   const [overridesByTire, setOverridesByTire] = useState<Map<string, TireStoreOverride>>(new Map());
   const [categories, setCategories] = useState<Category[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [taxes, setTaxes] = useState<Tax[]>([]);
+  const [discounts, setDiscounts] = useState<Discount[]>([]);
   const [store, setStore] = useState<Store | null>(null);
   const [receiptConfig, setReceiptConfig] = useState<ReceiptConfig | null>(null);
   const [loyalty, setLoyalty] = useState<LoyaltyConfig>(DEFAULT_LOYALTY);
@@ -72,6 +79,8 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethodId, setPaymentMethodId] = useState('');
   const [customerId, setCustomerId] = useState('');
+  const [ticketDiscountId, setTicketDiscountId] = useState('');
+  const [pendingDiscountValue, setPendingDiscountValue] = useState<string>('');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -99,7 +108,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const [tiresV2, cats, custs, ovr, pms, taxesData, storeData, rConfig, { data: loyaltyData }, parked, empsRes] = await Promise.all([
+      const [tiresV2, cats, custs, ovr, pms, taxesData, discountsData, storeData, rConfig, { data: loyaltyData }, parked, empsRes] = await Promise.all([
         tireServiceV2.getAll(),
         categoryService.getAll(),
         customerServiceV2.getAll(),
@@ -108,6 +117,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
           ensureNoError(r.data, r.error, 'POSView.paymentMethods').map(row => rowToCamel<PaymentMethod>(row)),
         ),
         taxService.getAll(),
+        discountService.getForStore(storeId),
         storeService.getById(storeId),
         receiptConfigService.getByStore(storeId).catch(() => null),
         supabase.from('loyalty_config').select('*').maybeSingle(),
@@ -126,6 +136,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
       setCustomers(custs);
       setPaymentMethods(pms);
       setTaxes(taxesData);
+      setDiscounts(discountsData);
       setStore(storeData ?? null);
       setReceiptConfig(rConfig);
       if (loyaltyData) {
@@ -185,12 +196,26 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
 
   const selectedPm = paymentMethods.find(p => p.id === paymentMethodId);
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0);
+
+  // Descuento de ticket. Si tiene `value` definido se aplica directo; si es
+  // null el cajero ingresa el monto/porcentaje en un modal antes de cobrar.
+  const ticketDiscount = discounts.find(d => d.id === ticketDiscountId) ?? null;
+  const ticketDiscountAmount = (() => {
+    if (!ticketDiscount) return 0;
+    const v = ticketDiscount.value ?? Number(pendingDiscountValue);
+    if (!Number.isFinite(v) || v <= 0) return 0;
+    if (ticketDiscount.type === 'percent') {
+      return Math.min(subtotal, subtotal * (v / 100));
+    }
+    return Math.min(subtotal, v);
+  })();
+  const subtotalAfterDiscount = Math.max(0, subtotal - ticketDiscountAmount);
   const surchargeRate = (selectedPm?.surchargePercent ?? 0) / 100;
-  // Gross-up: total = subtotal / (1 - rate). Para rate=0 → total=subtotal.
+  // Gross-up: total = base / (1 - rate). Para rate=0 → total=base.
   const total = surchargeRate > 0 && surchargeRate < 1
-    ? subtotal / (1 - surchargeRate)
-    : subtotal;
-  const surchargeAmount = total - subtotal;
+    ? subtotalAfterDiscount / (1 - surchargeRate)
+    : subtotalAfterDiscount;
+  const surchargeAmount = total - subtotalAfterDiscount;
 
   // Desglose de IVA: para cada item del carrito, sumar impuestos contenidos
   // (price ya los incluye) y agregados (suman al total).
@@ -276,8 +301,26 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
     setCheckoutOpen(true);
   }
 
+  /**
+   * Resuelve el discount con el valor efectivo: si `value` es null el cajero
+   * lo ingresó en `pendingDiscountValue`, lo materializamos en un objeto
+   * Discount nuevo para que `receiptService` lo aplique sin pedirlo.
+   */
+  function resolvedTicketDiscount(): Discount | null {
+    if (!ticketDiscount) return null;
+    if (ticketDiscount.value !== null) return ticketDiscount;
+    const v = Number(pendingDiscountValue);
+    if (!Number.isFinite(v) || v <= 0) return null;
+    return { ...ticketDiscount, value: v };
+  }
+
   async function confirmSale() {
     if (!cashSession || !employeeId || !selectedPm) return;
+    const resolvedDiscount = resolvedTicketDiscount();
+    if (ticketDiscount && !resolvedDiscount) {
+      addToast('Ingresá el valor del descuento.', 'warning');
+      return;
+    }
     setConfirming(true);
     try {
       const input: BuildReceiptInput = {
@@ -286,7 +329,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         employeeId,
         customerId: customerId || undefined,
         cart: cart.map(ci => ({ tireId: ci.tire.id, quantity: ci.quantity, modifiers: [] })),
-        ticketDiscountIds: [],
+        ticketDiscountIds: resolvedDiscount ? [resolvedDiscount.id] : [],
         paymentSplits: [{ paymentMethodId: selectedPm.id, amount: total }],
         type: 'sale',
       };
@@ -295,13 +338,15 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
       const overrideById = overridesByTire;
       const categoryById = new Map(categories.map(c => [c.id, c]));
       const pmById = new Map(paymentMethods.map(p => [p.id, p]));
+      const discountById = new Map(discounts.map(d => [d.id, d]));
+      if (resolvedDiscount) discountById.set(resolvedDiscount.id, resolvedDiscount);
 
       const receipt = await receiptService.buildAndSave(input, {
         getTire: id => tireById.get(id),
         getOverride: (tireId, sId) => sId === storeId ? overrideById.get(tireId) : undefined,
         getCategory: id => categoryById.get(id),
         getTax: id => taxesById.get(id),
-        getDiscount: () => undefined,
+        getDiscount: id => discountById.get(id),
         getPaymentMethod: id => pmById.get(id),
         loyalty,
         nextReceiptNumber,
@@ -315,6 +360,8 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
       setLastReceiptData({ receipt, lines: recLines, customer: selectedCustomer ?? null });
       setCart([]);
       setCustomerId('');
+      setTicketDiscountId('');
+      setPendingDiscountValue('');
       setCheckoutOpen(false);
       setSuccessOpen(true);
       addToast(`Venta ${receipt.receiptNumber} registrada.`, 'success');
@@ -365,13 +412,14 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
     }
     setParking(true);
     try {
+      const resolvedDiscount = resolvedTicketDiscount();
       const input: BuildReceiptInput = {
         storeId,
         cashSessionId: cashSession.id,
         employeeId,
         customerId: customerId || undefined,
         cart: cart.map(ci => ({ tireId: ci.tire.id, quantity: ci.quantity, modifiers: [] })),
-        ticketDiscountIds: [],
+        ticketDiscountIds: resolvedDiscount ? [resolvedDiscount.id] : [],
         paymentSplits: [],
         type: 'sale',
         parkedName: name,
@@ -380,12 +428,14 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
       const overrideById = overridesByTire;
       const categoryById = new Map(categories.map(c => [c.id, c]));
       const pmById = new Map(paymentMethods.map(p => [p.id, p]));
+      const discountById = new Map(discounts.map(d => [d.id, d]));
+      if (resolvedDiscount) discountById.set(resolvedDiscount.id, resolvedDiscount);
       await receiptService.buildAndSave(input, {
         getTire: id => tireById.get(id),
         getOverride: (tireId, sId) => sId === storeId ? overrideById.get(tireId) : undefined,
         getCategory: id => categoryById.get(id),
         getTax: id => taxesById.get(id),
-        getDiscount: () => undefined,
+        getDiscount: id => discountById.get(id),
         getPaymentMethod: id => pmById.get(id),
         loyalty,
         nextReceiptNumber,
@@ -399,6 +449,8 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
 
       setCart([]);
       setCustomerId('');
+      setTicketDiscountId('');
+      setPendingDiscountValue('');
       setParkOpen(false);
       setParkName('');
       addToast(`Ticket "${name}" guardado.`, 'success');
@@ -619,11 +671,53 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
             </select>
           </div>
 
+          {canDiscount && discounts.length > 0 && (
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wide mb-1 flex items-center gap-1" style={{ color: 'var(--br-txt2)' }}>
+                <Tag className="h-3 w-3" /> Descuento
+              </label>
+              <select
+                value={ticketDiscountId}
+                onChange={(e) => { setTicketDiscountId(e.target.value); setPendingDiscountValue(''); }}
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+              >
+                <option value="">Sin descuento</option>
+                {discounts.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                    {d.value !== null
+                      ? ` · ${d.type === 'percent' ? `${d.value}%` : formatCurrency(d.value)}`
+                      : ' · pedir valor'}
+                  </option>
+                ))}
+              </select>
+              {ticketDiscount && ticketDiscount.value === null && (
+                <input
+                  type="number"
+                  value={pendingDiscountValue}
+                  onChange={(e) => setPendingDiscountValue(e.target.value)}
+                  placeholder={ticketDiscount.type === 'percent' ? '% (ej: 10)' : 'Monto $ (ej: 500)'}
+                  min="0"
+                  step="0.01"
+                  className="w-full mt-2 px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+                />
+              )}
+            </div>
+          )}
+
           <div className="space-y-1 text-sm">
             <div className="flex justify-between" style={{ color: 'var(--br-txt2)' }}>
               <span>Subtotal</span>
               <span className="font-mono">{formatCurrency(subtotal)}</span>
             </div>
+            {ticketDiscountAmount > 0 && (
+              <div className="flex justify-between text-xs" style={{ color: 'var(--br-grn)' }}>
+                <span>− {ticketDiscount?.name}</span>
+                <span className="font-mono">−{formatCurrency(ticketDiscountAmount)}</span>
+              </div>
+            )}
             {taxBreakdown.included.map(t => (
               <div key={t.name} className="flex justify-between text-xs" style={{ color: 'var(--br-txt2)' }}>
                 <span>{t.name} (incluido)</span>

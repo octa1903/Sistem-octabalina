@@ -7,6 +7,7 @@ import { wholesaleConfigService } from '@/services/wholesaleConfigService';
 import { DEFAULT_ORDER_CONFIG, DEFAULT_WHOLESALE_CONFIG } from '@/constants';
 import { Modal } from '@/components/ui/Modal';
 import { TaxesSection } from './settings/TaxesSection';
+import { DiscountsSection } from './settings/DiscountsSection';
 import { ReceiptConfigSection } from './settings/ReceiptConfigSection';
 import { EmployeesSection } from './settings/EmployeesSection';
 import { hasPermission } from '@/services/roleService';
@@ -156,6 +157,9 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
 
       {/* Taxes */}
       <TaxesSection addToast={addToast} />
+
+      {/* Discounts */}
+      <DiscountsSection addToast={addToast} />
 
       {/* Receipt config */}
       <ReceiptConfigSection
