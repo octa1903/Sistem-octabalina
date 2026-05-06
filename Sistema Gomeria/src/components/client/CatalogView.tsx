@@ -13,12 +13,14 @@ import { Search, ShoppingCart, Plus, Minus, Trash2, CheckCircle } from 'lucide-r
 
 interface Props {
   clientId: string;
+  /** Token de sesión emitido por el RPC customer_login. Requerido para crear pedidos. */
+  clientToken: string | undefined;
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
 }
 
 interface CartEntry { tire: Tire; quantity: number; }
 
-export function CatalogView({ clientId, addToast }: Props) {
+export function CatalogView({ clientId, clientToken, addToast }: Props) {
   const [tires, setTires] = useState<Tire[]>([]);
   const [client, setClient] = useState<Customer | null>(null);
   const [refStoreId, setRefStoreId] = useState<string | null>(null);
@@ -136,15 +138,17 @@ export function CatalogView({ clientId, addToast }: Props) {
       subtotal: priceFor(ci.tire) * ci.quantity,
     }));
 
+    if (!clientToken) {
+      addToast('Sesión expirada. Volvé a iniciar sesión.', 'error');
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await orderService.save({
-        customerId: clientId,
-        customerName: client?.name ?? '',
+      await orderService.createPublicOrder(clientToken, {
         storeId: refStoreId,
         items,
         paymentMethodId: PAYMENT_METHODS.find((p) => p.id === orderPayment)?.id ?? orderPayment,
-        status: 'pendiente',
         tipo: orderType,
         scheduledDate: orderDate,
         scheduledTime: orderTime || undefined,

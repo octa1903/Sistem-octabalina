@@ -8,15 +8,12 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { SessionType } from '@/types';
 import { storageGet, storageSet } from '@/utils/storage';
-import { verifyPin } from '@/utils/hash';
 import {
   EMPLOYEE_TIMEOUT,
-  CLIENT_TIMEOUT,
   MAX_LOGIN_ATTEMPTS,
   LOCKOUT_DURATION,
 } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
-import { customerServiceV2 } from '@/services/customerServiceV2';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -26,6 +23,8 @@ interface AuthState {
   employeeRole?: string;
   clientId?: string;
   clientName?: string;
+  // Token de sesión emitido por el RPC customer_login (sólo sessionType='client').
+  clientToken?: string;
   expiresAt: number;
 }
 
@@ -124,11 +123,19 @@ export function useAuth() {
   const logout = useCallback(async () => {
     if (auth.sessionType === 'employee') {
       await supabase.auth.signOut();
+    } else if (auth.sessionType === 'client' && auth.clientToken) {
+      // Best-effort: invalidar el token server-side. Si falla, igual limpiamos local.
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (supabase.rpc as any)('customer_logout', { p_token: auth.clientToken });
+      } catch {
+        // ignored
+      }
     }
     setAuth(INITIAL);
     storageSet('auth_session', null);
     setError(null);
-  }, [auth.sessionType]);
+  }, [auth.sessionType, auth.clientToken]);
 
   const employeeLogin = useCallback(
     async (email: string, password: string): Promise<boolean> => {
@@ -193,32 +200,33 @@ export function useAuth() {
       clientLoginInFlight.current = true;
       setError(null);
       try {
-        let customer: Awaited<ReturnType<typeof customerServiceV2.getById>>;
-        try {
-          customer = await customerServiceV2.getById(clientId);
-        } catch (e) {
-          setError(e instanceof Error ? e.message : 'Error consultando cliente.');
+        // RPC SECURITY DEFINER: verifica PIN server-side (con lockout) y devuelve token.
+        // Cast pragmático mientras database.ts no incluya las nuevas RPCs (regen pendiente).
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data, error: rpcErr } = await (supabase.rpc as any)('customer_login', {
+          p_customer_id: clientId,
+          p_pin: pin,
+        });
+        if (rpcErr) {
+          setError(rpcErr.message || 'Credenciales inválidas.');
           return false;
         }
-        if (!customer) {
-          setError('Cliente no encontrado.');
+        // El RPC devuelve un set; tomar la primera fila.
+        const row = (Array.isArray(data) ? data[0] : data) as
+          | { token: string; customer_id: string; customer_name: string; expires_at: string }
+          | undefined;
+        if (!row?.token) {
+          setError('Credenciales inválidas.');
           return false;
         }
-        if (!customer.pinHash) {
-          setError('Este cliente no tiene PIN configurado.');
-          return false;
-        }
-        const valid = await verifyPin(pin, customer.pinHash);
-        if (!valid) {
-          setError('PIN incorrecto.');
-          return false;
-        }
+        const expiresAt = row.expires_at ? new Date(row.expires_at).getTime() : Date.now() + 24 * 60 * 60 * 1000;
         setAuth({
           isAuthenticated: true,
           sessionType: 'client',
-          clientId: customer.id,
-          clientName: customer.name,
-          expiresAt: Date.now() + CLIENT_TIMEOUT,
+          clientId: row.customer_id,
+          clientName: row.customer_name,
+          clientToken: row.token,
+          expiresAt,
         });
         return true;
       } finally {

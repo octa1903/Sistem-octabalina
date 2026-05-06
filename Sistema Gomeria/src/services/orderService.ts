@@ -137,4 +137,41 @@ export const orderService = {
     const { error } = await supabase.from(TABLE).delete().eq('id', id);
     if (error) throw error;
   },
+
+  /**
+   * Crea un pedido desde el portal cliente (sin auth Supabase).
+   * Llama al RPC `customer_create_order` que valida el token de sesión
+   * server-side (emitido por `customer_login`) y bypassea RLS.
+   */
+  async createPublicOrder(
+    token: string,
+    input: {
+      storeId: string;
+      items: OrderItem[];
+      paymentMethodId?: string;
+      tipo: 'retiro' | 'entrega_domicilio';
+      scheduledDate: string;
+      scheduledTime?: string;
+      address?: string;
+      notes?: string;
+      totalAmount: number;
+    },
+  ): Promise<string> {
+    // Cast pragmático: las RPCs nuevas no están en database.ts hasta regen.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.rpc as any)('customer_create_order', {
+      p_token: token,
+      p_store_id: input.storeId,
+      p_items: input.items,
+      p_payment_method_id: input.paymentMethodId ?? null,
+      p_tipo: input.tipo,
+      p_scheduled_date: input.scheduledDate,
+      p_scheduled_time: input.scheduledTime ?? null,
+      p_address: input.address ?? null,
+      p_notes: input.notes ?? null,
+      p_total_amount: input.totalAmount,
+    });
+    if (error) throw error;
+    return data as string;
+  },
 };

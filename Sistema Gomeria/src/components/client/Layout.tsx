@@ -55,7 +55,7 @@ export function ClientApp({ auth }: Props) {
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-5">
-        {tab === 'catalog' && <CatalogView clientId={auth.clientId!} addToast={addToast} />}
+        {tab === 'catalog' && <CatalogView clientId={auth.clientId!} clientToken={auth.clientToken} addToast={addToast} />}
         {tab === 'orders'  && <MyOrdersView clientId={auth.clientId!} />}
         {tab === 'history' && <HistoryView clientId={auth.clientId!} />}
         {tab === 'account' && <AccountView clientId={auth.clientId!} />}
