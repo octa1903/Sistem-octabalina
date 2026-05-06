@@ -81,6 +81,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
   const [customerId, setCustomerId] = useState('');
   const [ticketDiscountId, setTicketDiscountId] = useState('');
   const [pendingDiscountValue, setPendingDiscountValue] = useState<string>('');
+  const [pointsToRedeem, setPointsToRedeem] = useState<string>('');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
@@ -195,6 +196,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
   }, [tireRows, search, filterCat]);
 
   const selectedPm = paymentMethods.find(p => p.id === paymentMethodId);
+  const selectedCustomer = customers.find(c => c.id === customerId);
   const subtotal = cart.reduce((s, i) => s + i.subtotal, 0);
 
   // Descuento de ticket. Si tiene `value` definido se aplica directo; si es
@@ -210,12 +212,22 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
     return Math.min(subtotal, v);
   })();
   const subtotalAfterDiscount = Math.max(0, subtotal - ticketDiscountAmount);
+
+  // Canje de puntos: 1 punto = $1. Cap por saldo del cliente y por subtotal
+  // post-descuento (no permitir total negativo).
+  const customerPointsBalance = Number(selectedCustomer?.pointsBalance ?? 0);
+  const requestedPoints = Math.max(0, Math.floor(Number(pointsToRedeem) || 0));
+  const pointsRedeemed = loyalty.enabled && selectedCustomer
+    ? Math.min(requestedPoints, customerPointsBalance, subtotalAfterDiscount)
+    : 0;
+  const subtotalAfterRedeem = Math.max(0, subtotalAfterDiscount - pointsRedeemed);
+
   const surchargeRate = (selectedPm?.surchargePercent ?? 0) / 100;
   // Gross-up: total = base / (1 - rate). Para rate=0 → total=base.
   const total = surchargeRate > 0 && surchargeRate < 1
-    ? subtotalAfterDiscount / (1 - surchargeRate)
-    : subtotalAfterDiscount;
-  const surchargeAmount = total - subtotalAfterDiscount;
+    ? subtotalAfterRedeem / (1 - surchargeRate)
+    : subtotalAfterRedeem;
+  const surchargeAmount = total - subtotalAfterRedeem;
 
   // Desglose de IVA: para cada item del carrito, sumar impuestos contenidos
   // (price ya los incluye) y agregados (suman al total).
@@ -243,8 +255,6 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
       added: Object.values(added),
     };
   }, [cart, taxesById, storeId]);
-
-  const selectedCustomer = customers.find(c => c.id === customerId);
 
   function addToCart(row: typeof tireRows[number]) {
     setCart(prev => {
@@ -332,6 +342,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         ticketDiscountIds: resolvedDiscount ? [resolvedDiscount.id] : [],
         paymentSplits: [{ paymentMethodId: selectedPm.id, amount: total }],
         type: 'sale',
+        pointsRedeemed: pointsRedeemed || undefined,
       };
 
       const tireById = new Map(tires.map(t => [t.id, t]));
@@ -362,6 +373,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
       setCustomerId('');
       setTicketDiscountId('');
       setPendingDiscountValue('');
+      setPointsToRedeem('');
       setCheckoutOpen(false);
       setSuccessOpen(true);
       addToast(`Venta ${receipt.receiptNumber} registrada.`, 'success');
@@ -651,6 +663,29 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               <option value="">Sin cliente</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
+            {loyalty.enabled && selectedCustomer && customerPointsBalance > 0 && (
+              <div className="mt-2">
+                <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
+                  Canjear puntos · saldo {customerPointsBalance.toFixed(0)} pts
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={Math.min(customerPointsBalance, subtotalAfterDiscount)}
+                  step={1}
+                  value={pointsToRedeem}
+                  onChange={(e) => setPointsToRedeem(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+                />
+                {requestedPoints > pointsRedeemed && (
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--br-amb)' }}>
+                    Limitado a {pointsRedeemed} pts (saldo o subtotal).
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <div>
@@ -716,6 +751,12 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               <div className="flex justify-between text-xs" style={{ color: 'var(--br-grn)' }}>
                 <span>− {ticketDiscount?.name}</span>
                 <span className="font-mono">−{formatCurrency(ticketDiscountAmount)}</span>
+              </div>
+            )}
+            {pointsRedeemed > 0 && (
+              <div className="flex justify-between text-xs" style={{ color: 'var(--br-grn)' }}>
+                <span>− {pointsRedeemed} puntos canjeados</span>
+                <span className="font-mono">−{formatCurrency(pointsRedeemed)}</span>
               </div>
             )}
             {taxBreakdown.included.map(t => (

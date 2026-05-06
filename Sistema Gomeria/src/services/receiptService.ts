@@ -184,7 +184,11 @@ export const receiptService = {
     );
 
     const sumLineTotals = sum(lines.map(l => l.total));
-    const totalRaw = sumLineTotals - sum(ticketDiscounts.map(d => d.amount)) + pmSurcharge;
+    const pointsRedeemed = input.pointsRedeemed ?? 0;
+    const totalRaw = sumLineTotals
+      - sum(ticketDiscounts.map(d => d.amount))
+      - pointsRedeemed
+      + pmSurcharge;
     const total = input.type === 'refund' ? -Math.abs(totalRaw) : totalRaw;
 
     // Tickets abiertos (parked): se persisten sin pagos y NO descuentan stock
@@ -235,7 +239,7 @@ export const receiptService = {
       total_cogs: totalCogs,
       total,
       points_earned: pointsEarned,
-      points_redeemed: input.pointsRedeemed ?? 0,
+      points_redeemed: pointsRedeemed,
       notes: input.notes ?? null,
     };
 
