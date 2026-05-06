@@ -141,7 +141,10 @@ export const orderService = {
   /**
    * Crea un pedido desde el portal cliente (sin auth Supabase).
    * Llama al RPC `customer_create_order` que valida el token de sesión
-   * server-side (emitido por `customer_login`) y bypassea RLS.
+   * server-side (emitido por `customer_login`), recalcula total + unit_price
+   * por item desde tires/tire_store_overrides + customers.wholesale_discount,
+   * y bypassea RLS. El total que ve el cliente en la UI es referencial: el
+   * server escribe el autoritativo.
    */
   async createPublicOrder(
     token: string,
@@ -154,7 +157,6 @@ export const orderService = {
       scheduledTime?: string;
       address?: string;
       notes?: string;
-      totalAmount: number;
     },
   ): Promise<string> {
     // Cast pragmático: las RPCs nuevas no están en database.ts hasta regen.
@@ -169,7 +171,6 @@ export const orderService = {
       p_scheduled_time: input.scheduledTime ?? null,
       p_address: input.address ?? null,
       p_notes: input.notes ?? null,
-      p_total_amount: input.totalAmount,
     });
     if (error) throw error;
     return data as string;

@@ -153,7 +153,6 @@ export function CatalogView({ clientId, clientToken, addToast }: Props) {
         scheduledDate: orderDate,
         scheduledTime: orderTime || undefined,
         address: orderType === 'entrega_domicilio' ? orderAddress : undefined,
-        totalAmount: cartTotal,
       });
       setCart([]);
       setOrderOpen(false);
