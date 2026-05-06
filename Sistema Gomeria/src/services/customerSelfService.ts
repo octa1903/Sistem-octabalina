@@ -9,7 +9,8 @@
 
 import { supabase } from './supabaseClient';
 import { rowToCamel } from './supabaseHelpers';
-import type { Customer, CustomerAccountMovement, Receipt, ReceiptLine } from '@/types';
+import { toLegacyOrder } from './orderService';
+import type { Customer, CustomerAccountMovement, Order, Receipt, ReceiptLine } from '@/types';
 
 // Cast pragmático: las RPCs nuevas no están en database.ts hasta regen.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,6 +35,12 @@ export const customerSelfService = {
     const { data, error } = await rpc('customer_self_receipts', { p_token: token, p_limit: limit });
     if (error) throw error;
     return ((data ?? []) as Record<string, unknown>[]).map(r => rowToCamel<Receipt>(r));
+  },
+
+  async getOrders(token: string, limit = 100): Promise<Order[]> {
+    const { data, error } = await rpc('customer_self_orders', { p_token: token, p_limit: limit });
+    if (error) throw error;
+    return ((data ?? []) as Record<string, unknown>[]).map(r => toLegacyOrder(r));
   },
 
   async getReceiptLines(token: string, receiptIds: string[]): Promise<Map<string, ReceiptLine[]>> {

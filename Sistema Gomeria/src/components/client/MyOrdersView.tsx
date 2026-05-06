@@ -1,27 +1,31 @@
 import { useState, useMemo, useEffect } from 'react';
 import type { Order } from '@/types';
-import { orderService } from '@/services/orderService';
+import { customerSelfService } from '@/services/customerSelfService';
 import { STATUS_COLORS, STATUS_LABELS } from '@/constants';
 import { formatCurrency } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
 import { Package, Truck, ChevronRight } from 'lucide-react';
 
-interface Props { clientId: string; }
+interface Props { clientToken: string | undefined; }
 
-export function MyOrdersView({ clientId }: Props) {
+export function MyOrdersView({ clientToken }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Order | null>(null);
 
   useEffect(() => {
     let active = true;
+    if (!clientToken) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    orderService.getByClient(clientId)
+    customerSelfService.getOrders(clientToken)
       .then((data) => { if (active) setOrders(data); })
-      .catch(() => { /* sin addToast en este componente — los errores son silenciosos para el cliente */ })
+      .catch(() => { /* errores silenciosos: el cliente ve "sin pedidos" */ })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [clientId]);
+  }, [clientToken]);
 
   const active = useMemo(() => orders.filter((o) => !['entregado', 'cancelado'].includes(o.status)), [orders]);
   const past = useMemo(() => orders.filter((o) => ['entregado', 'cancelado'].includes(o.status)), [orders]);
