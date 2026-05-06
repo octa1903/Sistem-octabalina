@@ -3,7 +3,7 @@ import type { Tire, Customer, OrderItem, OrderConfig } from '@/types';
 import { orderService } from '@/services/orderService';
 import { orderConfigService } from '@/services/orderConfigService';
 import { tireServiceV2 } from '@/services/tireServiceV2';
-import { customerServiceV2 } from '@/services/customerServiceV2';
+import { customerSelfService } from '@/services/customerSelfService';
 import { categoryService } from '@/services/categoryService';
 import { storeService } from '@/services/storeService';
 import { TIRE_CATEGORIES, PAYMENT_METHODS, DEFAULT_ORDER_CONFIG } from '@/constants';
@@ -60,7 +60,7 @@ export function CatalogView({ clientId, clientToken, addToast }: Props) {
           tireServiceV2.getAll(),
           categoryService.getAll(),
           tireServiceV2.getOverridesByStore(storeId),
-          customerServiceV2.getById(clientId),
+          clientToken ? customerSelfService.getProfile(clientToken) : Promise.resolve(null),
         ]);
         if (!active) return;
         const overrideByTire = new Map(overrides.map(o => [o.tireId, o]));

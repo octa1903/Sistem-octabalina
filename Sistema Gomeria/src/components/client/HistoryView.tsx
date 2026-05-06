@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react';
 import type { Receipt, ReceiptLine, PaymentMethod } from '@/types';
-import { receiptService } from '@/services/receiptService';
+import { customerSelfService } from '@/services/customerSelfService';
 import { supabase } from '@/services/supabaseClient';
 import { rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
 import { ShoppingBag } from 'lucide-react';
 
-interface Props { clientId: string; }
+interface Props { clientToken: string | undefined; }
 
 interface Row {
   receipt: Receipt;
   lines: ReceiptLine[];
 }
 
-export function HistoryView({ clientId }: Props) {
+export function HistoryView({ clientToken }: Props) {
   const [rows, setRows] = useState<Row[]>([]);
   const [pmById, setPmById] = useState<Map<string, PaymentMethod>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -21,20 +21,26 @@ export function HistoryView({ clientId }: Props) {
 
   useEffect(() => {
     let active = true;
+    if (!clientToken) {
+      setError('Sesión expirada. Volvé a iniciar sesión.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     (async () => {
       try {
         const [receipts, pmRes] = await Promise.all([
-          receiptService.getByCustomer(clientId, { limit: 50 }),
+          customerSelfService.getReceipts(clientToken, 50),
           supabase.from('payment_methods').select('*'),
         ]);
-        // payment_methods es solo para mostrar nombre del medio de pago; si
-        // falla, mostramos '—' pero no rompemos el historial.
         const pms: PaymentMethod[] = pmRes.error
           ? []
           : (pmRes.data ?? []).map(r => rowToCamel<PaymentMethod>(r));
-        const linesByReceipt = await receiptService.getLinesForReceipts(receipts.map(r => r.id));
+        const linesByReceipt = await customerSelfService.getReceiptLines(
+          clientToken,
+          receipts.map(r => r.id),
+        );
         if (!active) return;
         setPmById(new Map(pms.map(p => [p.id, p])));
         setRows(receipts.map(r => ({ receipt: r, lines: linesByReceipt.get(r.id) ?? [] })));
@@ -45,7 +51,7 @@ export function HistoryView({ clientId }: Props) {
       }
     })();
     return () => { active = false; };
-  }, [clientId]);
+  }, [clientToken]);
 
   const total = rows.reduce((s, r) => s + r.receipt.total, 0);
 

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import type { Customer, CustomerAccountMovement } from '@/types';
-import { customerServiceV2 } from '@/services/customerServiceV2';
+import { customerSelfService } from '@/services/customerSelfService';
 import { formatCurrency } from '@/utils/currency';
 import { Phone, MapPin, Mail, TrendingDown } from 'lucide-react';
 
-interface Props { clientId: string; }
+interface Props { clientToken: string | undefined; }
 
 function formatAddress(addr: Customer['address']): string {
   if (!addr) return '';
@@ -12,7 +12,7 @@ function formatAddress(addr: Customer['address']): string {
   return [addr.street, addr.city].filter(Boolean).join(', ');
 }
 
-export function AccountView({ clientId }: Props) {
+export function AccountView({ clientToken }: Props) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [movements, setMovements] = useState<CustomerAccountMovement[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,11 +20,16 @@ export function AccountView({ clientId }: Props) {
 
   useEffect(() => {
     let active = true;
+    if (!clientToken) {
+      setError('Sesión expirada. Volvé a iniciar sesión.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     Promise.all([
-      customerServiceV2.getById(clientId),
-      customerServiceV2.getMovements(clientId),
+      customerSelfService.getProfile(clientToken),
+      customerSelfService.getMovements(clientToken),
     ])
       .then(([c, m]) => {
         if (!active) return;
@@ -34,7 +39,7 @@ export function AccountView({ clientId }: Props) {
       .catch((e) => active && setError(e instanceof Error ? e.message : 'Error cargando cuenta'))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [clientId]);
+  }, [clientToken]);
 
   if (loading) return <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>Cargando cuenta…</p>;
   if (error) return <p className="text-sm" style={{ color: 'var(--br-red)' }}>{error}</p>;
