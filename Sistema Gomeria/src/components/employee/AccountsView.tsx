@@ -108,7 +108,8 @@ export function AccountsView({ addToast, employeeId }: Props) {
     }
     setSubmitting(true);
     try {
-      // Insertar movimiento
+      // El trigger customer_account_movements_balance (migración 0007) actualiza
+      // customers.account_balance automáticamente al insertar el movimiento.
       await customerServiceV2.addMovement({
         customerId: selected.id,
         type: paymentType,
@@ -116,13 +117,6 @@ export function AccountsView({ addToast, employeeId }: Props) {
         paymentMethodId,
         notes: notes || undefined,
         employeeId: employeeId ?? undefined,
-      });
-      // Actualizar balance: charge suma, payment resta
-      const delta = paymentType === 'charge' ? num : -num;
-      await customerServiceV2.save({
-        id: selected.id,
-        name: selected.name,
-        accountBalance: selected.accountBalance + delta,
       });
       await refresh();
       await loadMovements(selected.id);
