@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Order, OrderStatus } from '@/types';
-import { orderService } from '@/services/storageService';
+import { orderService } from '@/services/orderService';
 import { STATUS_COLORS, STATUS_LABELS, STATUS_FLOW } from '@/constants';
 import { Modal } from '@/components/ui/Modal';
 import { formatCurrency } from '@/utils/currency';
@@ -11,14 +11,38 @@ interface Props { addToast: (msg: string, type?: 'success' | 'error' | 'warning'
 const ALL_STATUSES: OrderStatus[] = ['pendiente', 'confirmado', 'en_preparacion', 'listo', 'entregado', 'cancelado'];
 
 export function OrdersView({ addToast }: Props) {
-  const [orders, setOrders] = useState<Order[]>(() =>
-    orderService.getAll().sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-  );
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<OrderStatus | ''>('');
   const [selected, setSelected] = useState<Order | null>(null);
   const [internalNote, setInternalNote] = useState('');
   const [clientMessage, setClientMessage] = useState('');
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await orderService.getAll();
+      setOrders(data);
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error cargando pedidos.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    orderService.getAll()
+      .then((data) => { if (active) setOrders(data); })
+      .catch((e) => { if (active) addToast(e instanceof Error ? e.message : 'Error cargando pedidos.', 'error'); })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -31,18 +55,26 @@ export function OrdersView({ addToast }: Props) {
 
   const activeCount = orders.filter((o) => !['entregado', 'cancelado'].includes(o.status)).length;
 
-  function advanceStatus(order: Order, newStatus: OrderStatus) {
-    const now = new Date().toISOString();
-    const updated: Order = { ...order, status: newStatus, updatedAt: now };
-    if (internalNote.trim()) updated.internalNotes = internalNote.trim();
-    if (clientMessage.trim()) updated.clientMessage = clientMessage.trim();
-    orderService.save(updated);
-    const refreshed = orderService.getAll().sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    setOrders(refreshed);
-    setSelected(refreshed.find((o) => o.id === order.id) ?? null);
-    setInternalNote('');
-    setClientMessage('');
-    addToast(`Pedido ${newStatus}.`, 'success');
+  async function advanceStatus(order: Order, newStatus: OrderStatus) {
+    setSaving(true);
+    try {
+      await orderService.updateStatus(order.id, newStatus, {
+        internalNotes: internalNote.trim() || undefined,
+        clientMessage: clientMessage.trim() || undefined,
+      });
+      await refresh();
+      setSelected((prev) => {
+        const refreshed = orders.find((o) => o.id === order.id);
+        return refreshed ? { ...refreshed, status: newStatus } : prev;
+      });
+      setInternalNote('');
+      setClientMessage('');
+      addToast(`Pedido ${newStatus}.`, 'success');
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error actualizando pedido.', 'error');
+    } finally {
+      setSaving(false);
+    }
   }
 
   const badge = (status: OrderStatus) => (
@@ -57,7 +89,7 @@ export function OrdersView({ addToast }: Props) {
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Pedidos</h1>
           <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
-            {activeCount} activos · {orders.length} total
+            {loading ? 'Cargando…' : `${activeCount} activos · ${orders.length} total`}
           </p>
         </div>
       </div>
@@ -79,7 +111,9 @@ export function OrdersView({ addToast }: Props) {
       </div>
 
       <div className="space-y-2">
-        {filtered.length === 0 ? (
+        {loading ? (
+          <p className="text-sm text-center py-12" style={{ color: 'var(--br-txt2)' }}>Cargando pedidos…</p>
+        ) : filtered.length === 0 ? (
           <div className="rounded-xl py-12 text-center" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
             <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
               {orders.length === 0 ? 'No hay pedidos registrados.' : 'Sin resultados.'}
@@ -174,8 +208,9 @@ export function OrdersView({ addToast }: Props) {
                   <div className="flex gap-2 flex-wrap">
                     {STATUS_FLOW[selected.status].map((next) => (
                       <button key={next} onClick={() => advanceStatus(selected, next as OrderStatus)}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold border ${STATUS_COLORS[next]}`}>
-                        → {STATUS_LABELS[next]}
+                        disabled={saving}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold border ${STATUS_COLORS[next]} disabled:opacity-50`}>
+                        {saving ? 'Guardando…' : `→ ${STATUS_LABELS[next]}`}
                       </button>
                     ))}
                   </div>

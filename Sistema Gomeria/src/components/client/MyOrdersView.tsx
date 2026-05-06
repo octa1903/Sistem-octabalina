@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import type { Order } from '@/types';
-import { orderService } from '@/services/storageService';
+import { orderService } from '@/services/orderService';
 import { STATUS_COLORS, STATUS_LABELS } from '@/constants';
 import { formatCurrency } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
@@ -9,10 +9,19 @@ import { Package, Truck, ChevronRight } from 'lucide-react';
 interface Props { clientId: string; }
 
 export function MyOrdersView({ clientId }: Props) {
-  const [orders] = useState<Order[]>(() =>
-    orderService.getByClient(clientId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
-  );
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Order | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    orderService.getByClient(clientId)
+      .then((data) => { if (active) setOrders(data); })
+      .catch(() => { /* sin addToast en este componente — los errores son silenciosos para el cliente */ })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [clientId]);
 
   const active = useMemo(() => orders.filter((o) => !['entregado', 'cancelado'].includes(o.status)), [orders]);
   const past = useMemo(() => orders.filter((o) => ['entregado', 'cancelado'].includes(o.status)), [orders]);
@@ -51,7 +60,9 @@ export function MyOrdersView({ clientId }: Props) {
     <div>
       <h1 className="text-xl font-semibold mb-4" style={{ color: 'var(--br-txt)' }}>Mis Pedidos</h1>
 
-      {orders.length === 0 ? (
+      {loading ? (
+        <p className="text-sm text-center py-16" style={{ color: 'var(--br-txt2)' }}>Cargando pedidos…</p>
+      ) : orders.length === 0 ? (
         <div className="text-center py-16 rounded-xl" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
           <Package className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--br-txt2)' }} />
           <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>No tenés pedidos aún. Hacé un pedido desde el Catálogo.</p>

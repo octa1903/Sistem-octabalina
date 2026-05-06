@@ -1,7 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { OrderConfig, WholesaleConfig } from '@/types';
 import type { useAuth } from '@/hooks/useAuth';
-import { configService, backupService } from '@/services/storageService';
+import { backupService } from '@/services/storageService';
+import { orderConfigService } from '@/services/orderConfigService';
+import { wholesaleConfigService } from '@/services/wholesaleConfigService';
+import { DEFAULT_ORDER_CONFIG, DEFAULT_WHOLESALE_CONFIG } from '@/constants';
 import { Modal } from '@/components/ui/Modal';
 import { TaxesSection } from './settings/TaxesSection';
 import { ReceiptConfigSection } from './settings/ReceiptConfigSection';
@@ -24,22 +27,54 @@ const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
 export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, currentRole }: Props) {
   const canManageEmployees = hasPermission(currentRole ?? null, 'employees.manage');
-  const [orderConfig, setOrderConfig] = useState<OrderConfig>(() => configService.getOrderConfig());
-  const [wholesaleConfig, setWholesaleConfig] = useState<WholesaleConfig>(() => configService.getWholesaleConfig());
+  const [orderConfig, setOrderConfig] = useState<OrderConfig>({ ...DEFAULT_ORDER_CONFIG });
+  const [wholesaleConfig, setWholesaleConfig] = useState<WholesaleConfig>({ ...DEFAULT_WHOLESALE_CONFIG });
+  const [configLoading, setConfigLoading] = useState(true);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [savingWholesale, setSavingWholesale] = useState(false);
   const [pwdOpen, setPwdOpen] = useState(false);
   const [currentPwd, setCurrentPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
   const [pwdError, setPwdError] = useState('');
 
-  function saveOrderConfig() {
-    configService.saveOrderConfig(orderConfig);
-    addToast('Configuración de pedidos guardada.', 'success');
+  useEffect(() => {
+    let active = true;
+    setConfigLoading(true);
+    Promise.all([orderConfigService.get(), wholesaleConfigService.get()])
+      .then(([oc, wc]) => {
+        if (!active) return;
+        setOrderConfig(oc);
+        setWholesaleConfig(wc);
+      })
+      .catch((e) => { if (active) addToast(e instanceof Error ? e.message : 'Error cargando configuración.', 'error'); })
+      .finally(() => { if (active) setConfigLoading(false); });
+    return () => { active = false; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function saveOrderConfig() {
+    setSavingOrder(true);
+    try {
+      await orderConfigService.save(orderConfig);
+      addToast('Configuración de pedidos guardada.', 'success');
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error guardando configuración de pedidos.', 'error');
+    } finally {
+      setSavingOrder(false);
+    }
   }
 
-  function saveWholesaleConfig() {
-    configService.saveWholesaleConfig(wholesaleConfig);
-    addToast('Configuración mayorista guardada.', 'success');
+  async function saveWholesaleConfig() {
+    setSavingWholesale(true);
+    try {
+      await wholesaleConfigService.save(wholesaleConfig);
+      addToast('Configuración mayorista guardada.', 'success');
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error guardando configuración mayorista.', 'error');
+    } finally {
+      setSavingWholesale(false);
+    }
   }
 
   async function changePassword() {
@@ -182,8 +217,9 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
             </div>
           ))}
         </div>
-        <button onClick={saveWholesaleConfig} className="mt-4 px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-amb)' }}>
-          Guardar configuración mayorista
+        <button onClick={saveWholesaleConfig} disabled={savingWholesale || configLoading}
+          className="mt-4 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
+          {savingWholesale ? 'Guardando…' : 'Guardar configuración mayorista'}
         </button>
       </Section>
 
@@ -258,8 +294,9 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
             </div>
           </div>
 
-          <button onClick={saveOrderConfig} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-amb)' }}>
-            Guardar configuración de pedidos
+          <button onClick={saveOrderConfig} disabled={savingOrder || configLoading}
+            className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
+            {savingOrder ? 'Guardando…' : 'Guardar configuración de pedidos'}
           </button>
         </div>
       </Section>

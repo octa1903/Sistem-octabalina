@@ -1,11 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
-import type { Tire, Customer, Order, OrderItem } from '@/types';
-import { orderService, configService } from '@/services/storageService';
+import type { Tire, Customer, OrderItem, OrderConfig } from '@/types';
+import { orderService } from '@/services/orderService';
+import { orderConfigService } from '@/services/orderConfigService';
 import { tireServiceV2 } from '@/services/tireServiceV2';
 import { customerServiceV2 } from '@/services/customerServiceV2';
 import { categoryService } from '@/services/categoryService';
 import { storeService } from '@/services/storeService';
-import { TIRE_CATEGORIES, PAYMENT_METHODS } from '@/constants';
+import { TIRE_CATEGORIES, PAYMENT_METHODS, DEFAULT_ORDER_CONFIG } from '@/constants';
 import { formatCurrency } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
 import { Search, ShoppingCart, Plus, Minus, Trash2, CheckCircle } from 'lucide-react';
@@ -20,7 +21,10 @@ interface CartEntry { tire: Tire; quantity: number; }
 export function CatalogView({ clientId, addToast }: Props) {
   const [tires, setTires] = useState<Tire[]>([]);
   const [client, setClient] = useState<Customer | null>(null);
+  const [refStoreId, setRefStoreId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [orderConfig, setOrderConfig] = useState<OrderConfig>({ ...DEFAULT_ORDER_CONFIG });
   const [search, setSearch] = useState('');
   const [filterCat, setFilterCat] = useState('');
   const [cart, setCart] = useState<CartEntry[]>([]);
@@ -32,19 +36,18 @@ export function CatalogView({ clientId, addToast }: Props) {
   const [orderAddress, setOrderAddress] = useState('');
   const [orderPayment, setOrderPayment] = useState('efectivo');
 
-  // Orders + config siguen en localStorage (Fase 6)
-  const orderConfig = useMemo(() => configService.getOrderConfig(), []);
-
   useEffect(() => {
     let active = true;
     setLoading(true);
     (async () => {
       try {
         // Catálogo: usamos la primera tienda como tienda de referencia para precios/stock.
-        // En Fase 6 (portal cliente) el cliente elegirá tienda explícitamente.
-        const stores = await storeService.getAll();
-        const refStoreId = stores[0]?.id ?? null;
-        if (!refStoreId) {
+        const [stores, oc] = await Promise.all([
+          storeService.getAll(),
+          orderConfigService.get(),
+        ]);
+        const storeId = stores[0]?.id ?? null;
+        if (!storeId) {
           if (active) {
             setTires([]);
             addToast('No hay tiendas configuradas. Contactá a la gomería.', 'warning');
@@ -54,7 +57,7 @@ export function CatalogView({ clientId, addToast }: Props) {
         const [tiresV2, cats, overrides, customer] = await Promise.all([
           tireServiceV2.getAll(),
           categoryService.getAll(),
-          tireServiceV2.getOverridesByStore(refStoreId),
+          tireServiceV2.getOverridesByStore(storeId),
           customerServiceV2.getById(clientId),
         ]);
         if (!active) return;
@@ -65,6 +68,8 @@ export function CatalogView({ clientId, addToast }: Props) {
           .filter(t => t.salePrice > 0 && t.stock > 0);
         setTires(list);
         setClient(customer ?? null);
+        setRefStoreId(storeId);
+        setOrderConfig(oc);
       } catch (e) {
         if (active) addToast(e instanceof Error ? e.message : 'Error cargando catálogo', 'error');
       } finally {
@@ -115,12 +120,12 @@ export function CatalogView({ clientId, addToast }: Props) {
 
   const cartTotal = cart.reduce((s, i) => s + priceFor(i.tire) * i.quantity, 0);
 
-  function submitOrder() {
+  async function submitOrder() {
     if (!orderConfig.enabled) { addToast('Los pedidos están deshabilitados.', 'error'); return; }
     if (!orderDate) { addToast('Seleccioná una fecha.', 'error'); return; }
     if (orderType === 'entrega_domicilio' && !orderAddress) { addToast('Ingresá una dirección.', 'error'); return; }
+    if (!refStoreId) { addToast('Error interno: tienda no cargada. Recargá la página.', 'error'); return; }
 
-    const now = new Date().toISOString();
     const items: OrderItem[] = cart.map((ci) => ({
       tireId: ci.tire.id,
       brand: ci.tire.brand,
@@ -131,28 +136,29 @@ export function CatalogView({ clientId, addToast }: Props) {
       subtotal: priceFor(ci.tire) * ci.quantity,
     }));
 
-    const order: Order = {
-      id: `o${Date.now()}`,
-      numero: `${Date.now()}`.slice(-6),
-      clientId,
-      clientName: client?.name ?? '',
-      items,
-      paymentMethod: PAYMENT_METHODS.find((p) => p.id === orderPayment)?.label ?? orderPayment,
-      status: 'pendiente',
-      tipo: orderType,
-      scheduledDate: orderDate,
-      scheduledTime: orderTime || undefined,
-      address: orderType === 'entrega_domicilio' ? orderAddress : undefined,
-      totalAmount: cartTotal,
-      createdAt: now,
-      updatedAt: now,
-    };
-
-    // Orders aún en localStorage hasta Fase 6 (portal cliente Supabase).
-    orderService.save(order);
-    setCart([]);
-    setOrderOpen(false);
-    setSuccessOpen(true);
+    setSubmitting(true);
+    try {
+      await orderService.save({
+        customerId: clientId,
+        customerName: client?.name ?? '',
+        storeId: refStoreId,
+        items,
+        paymentMethodId: PAYMENT_METHODS.find((p) => p.id === orderPayment)?.id ?? orderPayment,
+        status: 'pendiente',
+        tipo: orderType,
+        scheduledDate: orderDate,
+        scheduledTime: orderTime || undefined,
+        address: orderType === 'entrega_domicilio' ? orderAddress : undefined,
+        totalAmount: cartTotal,
+      });
+      setCart([]);
+      setOrderOpen(false);
+      setSuccessOpen(true);
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error enviando el pedido.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   // Min date for order
@@ -329,9 +335,9 @@ export function CatalogView({ clientId, addToast }: Props) {
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setOrderOpen(false)} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={submitOrder} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-amb)' }}>
-            Confirmar pedido
+          <button onClick={() => setOrderOpen(false)} disabled={submitting} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
+          <button onClick={submitOrder} disabled={submitting} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
+            {submitting ? 'Enviando…' : 'Confirmar pedido'}
           </button>
         </div>
       </Modal>
