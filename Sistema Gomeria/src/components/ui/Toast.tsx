@@ -16,16 +16,17 @@ const icons = {
   info: Info,
 };
 
-const colors = {
-  success: 'bg-green-50 border-green-200 text-green-800',
-  error: 'bg-red-50 border-red-200 text-red-800',
-  warning: 'bg-amber-50 border-amber-200 text-amber-800',
-  info: 'bg-blue-50 border-blue-200 text-blue-800',
+const styleMap: Record<NonNullable<ToastProps['type']>, { bg: string; bor: string; fg: string }> = {
+  success: { bg: 'var(--br-grn-bg)', bor: 'var(--br-grn-bor)', fg: 'var(--br-grn)' },
+  error: { bg: 'var(--br-red-bg)', bor: 'var(--br-red-bor)', fg: 'var(--br-red)' },
+  warning: { bg: 'var(--br-amb-bg)', bor: 'var(--br-amb-bor)', fg: 'var(--br-amb)' },
+  info: { bg: 'var(--br-info-bg)', bor: 'var(--br-info-bor)', fg: 'var(--br-info)' },
 };
 
 export function Toast({ message, type = 'info', onClose, duration = 4000 }: ToastProps) {
   const [visible, setVisible] = useState(true);
   const Icon = icons[type];
+  const palette = styleMap[type];
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -37,16 +38,30 @@ export function Toast({ message, type = 'info', onClose, duration = 4000 }: Toas
 
   return (
     <div
+      role={type === 'error' ? 'alert' : 'status'}
+      aria-live={type === 'error' ? 'assertive' : 'polite'}
       className={cn(
-        'fixed bottom-6 right-6 z-[60] flex items-center gap-3 rounded-lg border px-4 py-3 shadow-lg transition-all',
-        colors[type],
+        'fixed bottom-6 right-6 z-[60] flex items-center gap-3 rounded-lg px-4 py-3 transition-all',
         visible ? 'translate-y-0 opacity-100' : 'translate-y-2 opacity-0',
       )}
+      style={{
+        background: palette.bg,
+        border: `1px solid ${palette.bor}`,
+        color: palette.fg,
+        boxShadow: 'var(--br-shadow-md)',
+      }}
     >
       <Icon className="h-5 w-5 flex-shrink-0" />
       <p className="text-sm font-medium">{message}</p>
-      <button onClick={() => { setVisible(false); setTimeout(onClose, 300); }} className="ml-2 flex-shrink-0">
-        <X className="h-4 w-4 opacity-70 hover:opacity-100" />
+      <button
+        onClick={() => {
+          setVisible(false);
+          setTimeout(onClose, 300);
+        }}
+        aria-label="Descartar notificación"
+        className="ml-2 flex-shrink-0 opacity-70 hover:opacity-100"
+      >
+        <X className="h-4 w-4" />
       </button>
     </div>
   );

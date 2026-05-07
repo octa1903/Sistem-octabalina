@@ -13,7 +13,8 @@ import { ReceiptConfigSection } from './settings/ReceiptConfigSection';
 import { EmployeesSection } from './settings/EmployeesSection';
 import { hasPermission } from '@/services/roleService';
 import type { Role } from '@/types';
-import { Key, Download, Upload, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Key, Download, Upload, ToggleLeft, ToggleRight, Plus, X } from 'lucide-react';
+import { Button, IconButton, Input, FormField } from '@/components/ui';
 
 type AuthReturn = ReturnType<typeof useAuth>;
 interface Props {
@@ -138,10 +139,10 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
 
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <div className="rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-      <div className="px-5 py-3" style={{ background: 'var(--br-sur2)', borderBottom: '1px solid var(--br-bor)' }}>
+      <div className="px-6 py-3" style={{ background: 'var(--br-sur2)', borderBottom: '1px solid var(--br-bor)' }}>
         <p className="font-semibold text-sm" style={{ color: 'var(--br-txt)' }}>{title}</p>
       </div>
-      <div className="p-5">{children}</div>
+      <div className="p-6">{children}</div>
     </div>
   );
 
@@ -153,7 +154,7 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
   );
 
   return (
-    <div className="p-5 max-w-3xl mx-auto space-y-5">
+    <div className="p-6 max-w-3xl mx-auto space-y-6">
       <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Configuración</h1>
 
       {/* Taxes */}
@@ -179,11 +180,13 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
       <Section title="Seguridad">
         <div className="flex items-center justify-between">
           {label('Contraseña de empleado', 'Cambiá la contraseña de acceso al sistema.')}
-          <button onClick={() => setPwdOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white"
-            style={{ background: 'var(--br-dark)' }}>
-            <Key className="h-4 w-4" /> Cambiar contraseña
-          </button>
+          <Button
+            variant="secondary"
+            iconLeft={<Key className="h-4 w-4" />}
+            onClick={() => setPwdOpen(true)}
+          >
+            Cambiar contraseña
+          </Button>
         </div>
       </Section>
 
@@ -192,13 +195,11 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
         <div className="flex items-center justify-between flex-wrap gap-3">
           {label('Exportar / Importar', 'Guardá una copia de todos los datos o restaurá desde un backup.')}
           <div className="flex gap-2">
-            <button onClick={exportBackup}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold"
-              style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}>
-              <Download className="h-4 w-4" /> Exportar
-            </button>
-            <label className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer"
-              style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}>
+            <Button variant="secondary" iconLeft={<Download className="h-4 w-4" />} onClick={exportBackup}>
+              Exportar
+            </Button>
+            <label className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-semibold cursor-pointer transition-colors hover:bg-[var(--br-sur2)]"
+              style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}>
               <Upload className="h-4 w-4" /> Importar
               <input type="file" accept=".json" className="hidden" onChange={importBackup} />
             </label>
@@ -214,21 +215,26 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
             { label: 'Mín. unidades por ítem', key: 'minUnitsPerItem' as const },
             { label: 'Mín. monto pedido ($)', key: 'minOrderAmount' as const },
           ].map(({ label: l, key }) => (
-            <div key={key}>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>{l}</label>
-              <input type="number" min="0" value={wholesaleConfig[key]}
+            <FormField key={key} label={l}>
+              <Input
+                type="number"
+                min="0"
+                value={wholesaleConfig[key]}
                 onChange={(e) => setWholesaleConfig({ ...wholesaleConfig, [key]: Number(e.target.value) })}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-                onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-                onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')} />
-            </div>
+              />
+            </FormField>
           ))}
         </div>
-        <button onClick={saveWholesaleConfig} disabled={savingWholesale || configLoading}
-          className="mt-4 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
-          {savingWholesale ? 'Guardando…' : 'Guardar configuración mayorista'}
-        </button>
+        <div className="mt-4">
+          <Button
+            variant="primary"
+            loading={savingWholesale}
+            disabled={configLoading}
+            onClick={() => { void saveWholesaleConfig(); }}
+          >
+            Guardar configuración mayorista
+          </Button>
+        </div>
       </Section>
 
       {/* Order config */}
@@ -237,8 +243,10 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
           {/* Enable toggle */}
           <div className="flex items-center justify-between">
             {label('Habilitar pedidos online', 'Permite que los clientes hagan pedidos desde su acceso.')}
-            <button onClick={() => setOrderConfig((p) => ({ ...p, enabled: !p.enabled }))}
-              style={{ color: orderConfig.enabled ? 'var(--br-grn)' : 'var(--br-txt2)' }}>
+            <button
+              onClick={() => setOrderConfig((p) => ({ ...p, enabled: !p.enabled }))}
+              style={{ color: orderConfig.enabled ? 'var(--br-grn)' : 'var(--br-txt2)' }}
+            >
               {orderConfig.enabled
                 ? <ToggleRight className="h-8 w-8" />
                 : <ToggleLeft className="h-8 w-8" />}
@@ -273,13 +281,14 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
               { label: 'Máx. días anticipación', key: 'maxDaysAhead' as const },
               { label: 'Máx. pedidos por día', key: 'maxOrdersPerDay' as const },
             ].map(({ label: l, key }) => (
-              <div key={key}>
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>{l}</label>
-                <input type="number" min="0" value={orderConfig[key]}
+              <FormField key={key} label={l}>
+                <Input
+                  type="number"
+                  min="0"
+                  value={orderConfig[key]}
                   onChange={(e) => setOrderConfig({ ...orderConfig, [key]: Number(e.target.value) })}
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
-              </div>
+                />
+              </FormField>
             ))}
           </div>
 
@@ -289,50 +298,66 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
             <div className="space-y-2">
               {orderConfig.timeSlots.map((ts, i) => (
                 <div key={i} className="flex gap-2">
-                  <input type="text" value={ts} onChange={(e) => updateTimeSlot(i, e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
-                    style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
-                  <button onClick={() => setOrderConfig((p) => ({ ...p, timeSlots: p.timeSlots.filter((_, j) => j !== i) }))}
-                    className="px-3 py-2 rounded-lg text-sm" style={{ color: 'var(--br-red)', background: 'var(--br-red-bg)', border: '1px solid var(--br-red-bor)' }}>
-                    ✕
-                  </button>
+                  <Input
+                    type="text"
+                    value={ts}
+                    onChange={(e) => updateTimeSlot(i, e.target.value)}
+                    className="flex-1"
+                  />
+                  <IconButton
+                    label="Quitar horario"
+                    icon={<X className="h-4 w-4" />}
+                    tone="danger"
+                    size="md"
+                    onClick={() => setOrderConfig((p) => ({ ...p, timeSlots: p.timeSlots.filter((_, j) => j !== i) }))}
+                  />
                 </div>
               ))}
-              <button onClick={addTimeSlot} className="text-sm font-medium" style={{ color: 'var(--br-amb)' }}>+ Agregar horario</button>
+              <Button
+                variant="ghost"
+                size="sm"
+                iconLeft={<Plus className="h-4 w-4" />}
+                onClick={addTimeSlot}
+              >
+                Agregar horario
+              </Button>
             </div>
           </div>
 
-          <button onClick={saveOrderConfig} disabled={savingOrder || configLoading}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
-            {savingOrder ? 'Guardando…' : 'Guardar configuración de pedidos'}
-          </button>
+          <Button
+            variant="primary"
+            loading={savingOrder}
+            disabled={configLoading}
+            onClick={() => { void saveOrderConfig(); }}
+          >
+            Guardar configuración de pedidos
+          </Button>
         </div>
       </Section>
 
       {/* Change password modal */}
       <Modal open={pwdOpen} onClose={() => setPwdOpen(false)} title="Cambiar Contraseña Empleado" size="sm">
         <div className="space-y-3">
-          {['Contraseña actual', 'Nueva contraseña', 'Confirmar contraseña'].map((lbl, i) => {
-            const keys = [currentPwd, newPwd, confirmPwd];
-            const setters = [setCurrentPwd, setNewPwd, setConfirmPwd];
-            return (
-              <div key={i}>
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>{lbl}</label>
-                <input type="password" value={keys[i]} onChange={(e) => setters[i](e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-                  onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-                  onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')} />
-              </div>
-            );
-          })}
-          {pwdError && <p className="text-sm px-3 py-2 rounded-lg" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)' }}>{pwdError}</p>}
+          <FormField label="Contraseña actual">
+            <Input type="password" value={currentPwd} onChange={(e) => setCurrentPwd(e.target.value)} />
+          </FormField>
+          <FormField label="Nueva contraseña">
+            <Input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
+          </FormField>
+          <FormField label="Confirmar contraseña">
+            <Input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
+          </FormField>
+          {pwdError && (
+            <p className="text-sm px-3 py-2 rounded-lg" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)' }}>
+              {pwdError}
+            </p>
+          )}
         </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setPwdOpen(false)} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={changePassword} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-dark)' }}>
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="secondary" onClick={() => setPwdOpen(false)}>Cancelar</Button>
+          <Button variant="secondary" style={{ background: 'var(--br-dark)', color: '#fff', borderColor: 'var(--br-dark)' }} onClick={() => { void changePassword(); }}>
             Actualizar contraseña
-          </button>
+          </Button>
         </div>
       </Modal>
     </div>

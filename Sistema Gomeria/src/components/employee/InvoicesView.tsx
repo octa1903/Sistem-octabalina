@@ -8,8 +8,8 @@ import type { SupplierInvoice } from '@/types';
 import { supplierInvoiceService } from '@/services/supplierInvoiceService';
 import { INVOICE_TYPES } from '@/constants';
 import { formatCurrency } from '@/utils/currency';
-import { Modal } from '@/components/ui/Modal';
-import { Plus, Search, Edit2, Trash2, CheckCircle, XCircle } from 'lucide-react';
+import { Modal, Button, IconButton, Input, Select, EmptyState } from '@/components/ui';
+import { Plus, Search, Edit2, Trash2, CheckCircle, XCircle, FileText } from 'lucide-react';
 
 interface Props { addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void; }
 
@@ -162,26 +162,28 @@ export function InvoicesView({ addToast }: Props) {
             <span className="font-semibold font-mono" style={{ color: 'var(--br-red)' }}>{formatCurrency(totalUnpaid)}</span>
           </p>
         </div>
-        <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-semibold" style={{ background: 'var(--br-amb)' }}>
-          <Plus className="h-4 w-4" /> Nueva factura
-        </button>
+        <Button variant="primary" onClick={openNew} iconLeft={<Plus className="h-4 w-4" />}>
+          Nueva factura
+        </Button>
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--br-txt2)' }} />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+        <div className="flex-1 min-w-48">
+          <Input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar proveedor, número..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
-            style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }} />
+            iconLeft={<Search className="h-4 w-4" />}
+          />
         </div>
-        <select value={filterPaid} onChange={(e) => setFilterPaid(e.target.value as typeof filterPaid)}
-          className="px-3 py-2 rounded-lg text-sm outline-none"
-          style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
-          <option value="">Todas</option>
-          <option value="unpaid">Impagas</option>
-          <option value="paid">Pagadas</option>
-        </select>
+        <div className="w-40">
+          <Select value={filterPaid} onChange={(e) => setFilterPaid(e.target.value as typeof filterPaid)}>
+            <option value="">Todas</option>
+            <option value="unpaid">Impagas</option>
+            <option value="paid">Pagadas</option>
+          </Select>
+        </div>
       </div>
 
       <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }}>
@@ -198,7 +200,7 @@ export function InvoicesView({ addToast }: Props) {
               {loading ? (
                 <tr><td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--br-txt2)' }}>Cargando...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--br-txt2)' }}>Sin facturas.</td></tr>
+                <tr><td colSpan={8}><EmptyState icon={FileText} title="Sin facturas." density="compact" /></td></tr>
               ) : (
                 filtered.map((inv) => (
                   <tr key={inv.id} style={{ borderBottom: '1px solid var(--br-bor)' }}
@@ -227,16 +229,22 @@ export function InvoicesView({ addToast }: Props) {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1 justify-end">
-                        <button onClick={() => openEdit(inv)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }}
-                          onMouseOver={(e) => (e.currentTarget.style.color = 'var(--br-amb)')}
-                          onMouseOut={(e) => (e.currentTarget.style.color = 'var(--br-txt2)')}>
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => setDeleting(inv)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }}
-                          onMouseOver={(e) => (e.currentTarget.style.color = 'var(--br-red)')}
-                          onMouseOut={(e) => (e.currentTarget.style.color = 'var(--br-txt2)')}>
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                        <IconButton
+                          label="Editar"
+                          icon={<Edit2 className="h-4 w-4" />}
+                          tone="primary"
+                          size="sm"
+                          bordered={false}
+                          onClick={() => openEdit(inv)}
+                        />
+                        <IconButton
+                          label="Eliminar"
+                          icon={<Trash2 className="h-4 w-4" />}
+                          tone="danger"
+                          size="sm"
+                          bordered={false}
+                          onClick={() => setDeleting(inv)}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -253,38 +261,28 @@ export function InvoicesView({ addToast }: Props) {
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Tipo</label>
-              <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as InvoiceForm['type'] })}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
+              <Select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as InvoiceForm['type'] })}>
                 {INVOICE_TYPES.map((t) => <option key={t} value={t}>Factura {t}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Número *</label>
-              <input type="text" value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })}
-                placeholder="0001-00001234"
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
+              <Input type="text" value={form.number} onChange={(e) => setForm({ ...form, number: e.target.value })}
+                placeholder="0001-00001234" />
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Fecha</label>
-              <input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
+              <Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Proveedor *</label>
-              <input type="text" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
+              <Input type="text" value={form.supplier} onChange={(e) => setForm({ ...form, supplier: e.target.value })} />
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Vencimiento</label>
-              <input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
+              <Input type="date" value={form.dueDate} onChange={(e) => setForm({ ...form, dueDate: e.target.value })} />
             </div>
           </div>
 
@@ -294,23 +292,30 @@ export function InvoicesView({ addToast }: Props) {
             <div className="space-y-2">
               {form.items.map((item, i) => (
                 <div key={i} className="flex gap-2">
-                  <input type="text" value={item.description} onChange={(e) => updateItem(i, 'description', e.target.value)}
-                    placeholder="Descripción" className="flex-1 px-3 py-2 rounded-lg text-sm outline-none"
-                    style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
-                  <input type="number" value={item.quantity} onChange={(e) => updateItem(i, 'quantity', Number(e.target.value))}
-                    min="1" className="w-16 px-3 py-2 rounded-lg text-sm outline-none"
-                    style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
-                  <input type="number" value={item.unitPrice} onChange={(e) => updateItem(i, 'unitPrice', Number(e.target.value))}
-                    min="0" placeholder="Precio" className="w-28 px-3 py-2 rounded-lg text-sm outline-none"
-                    style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
+                  <div className="flex-1">
+                    <Input type="text" value={item.description} onChange={(e) => updateItem(i, 'description', e.target.value)}
+                      placeholder="Descripción" />
+                  </div>
+                  <div className="w-16">
+                    <Input type="number" value={item.quantity} onChange={(e) => updateItem(i, 'quantity', Number(e.target.value))}
+                      min="1" />
+                  </div>
+                  <div className="w-28">
+                    <Input type="number" value={item.unitPrice} onChange={(e) => updateItem(i, 'unitPrice', Number(e.target.value))}
+                      min="0" placeholder="Precio" />
+                  </div>
                   <span className="flex items-center text-sm font-mono w-28" style={{ color: 'var(--br-txt2)' }}>
                     {formatCurrency(item.quantity * item.unitPrice)}
                   </span>
                   {form.items.length > 1 && (
-                    <button onClick={() => setForm((p) => ({ ...p, items: p.items.filter((_, j) => j !== i) }))}
-                      className="p-2 rounded" style={{ color: 'var(--br-red)' }}>
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <IconButton
+                      label="Quitar ítem"
+                      icon={<Trash2 className="h-4 w-4" />}
+                      tone="danger"
+                      size="sm"
+                      bordered={false}
+                      onClick={() => setForm((p) => ({ ...p, items: p.items.filter((_, j) => j !== i) }))}
+                    />
                   )}
                 </div>
               ))}
@@ -327,18 +332,18 @@ export function InvoicesView({ addToast }: Props) {
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setModalOpen(false)} disabled={submitting} className="px-4 py-2 rounded-lg text-sm disabled:opacity-50" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={() => void saveInvoice()} disabled={submitting} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
-            {submitting ? 'Guardando...' : 'Guardar'}
-          </button>
+          <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={submitting}>Cancelar</Button>
+          <Button variant="primary" onClick={() => void saveInvoice()} loading={submitting}>
+            Guardar
+          </Button>
         </div>
       </Modal>
 
       <Modal open={!!deleting} onClose={() => setDeleting(null)} title="Eliminar factura" size="sm">
         <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>¿Eliminar factura {deleting?.type} {deleting?.number} de {deleting?.supplier}?</p>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setDeleting(null)} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={() => void confirmDelete()} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-red)' }}>Eliminar</button>
+          <Button variant="secondary" onClick={() => setDeleting(null)}>Cancelar</Button>
+          <Button variant="danger" onClick={() => void confirmDelete()}>Eliminar</Button>
         </div>
       </Modal>
     </div>

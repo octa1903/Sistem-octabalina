@@ -102,6 +102,7 @@ export function buildReceiptHtml(input: PrintReceiptInput): string {
   .amount { width: 22%; text-align: right; }
   .small { font-size: 10px; color: #444; }
   .footer { margin-top: 12px; text-align: center; font-size: 11px; }
+  .logo { display: block; max-width: 60mm; max-height: 24mm; margin: 0 auto 6px; object-fit: contain; }
   @media print {
     body { padding: 0; }
     .no-print { display: none; }
@@ -125,6 +126,7 @@ export function buildReceiptHtml(input: PrintReceiptInput): string {
   <button onclick="window.close()">Cerrar</button>
 </div>
 <div class="ticket">
+  ${config?.printedLogoUrl ? `<img class="logo" src="${escapeHtml(config.printedLogoUrl)}" alt="${escapeHtml(store.name)}">` : ''}
   <div class="center bold big">${escapeHtml(store.name)}</div>
   <div class="center small">${escapeHtml(addrLine(store.address))}</div>
   ${store.phone ? `<div class="center small">Tel: ${escapeHtml(store.phone)}</div>` : ''}

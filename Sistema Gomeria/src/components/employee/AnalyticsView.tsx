@@ -31,7 +31,8 @@ import {
   type CsvColumn,
   type PeriodPreset,
 } from '@/utils/reports';
-import { Download, Calendar, RefreshCw } from 'lucide-react';
+import { Download, Calendar, RefreshCw, BarChart2 } from 'lucide-react';
+import { Button, Input, Select, EmptyState } from '@/components/ui';
 
 interface Props {
   storeId: string;
@@ -220,23 +221,23 @@ export function AnalyticsView({ storeId }: Props) {
       <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Informes</h1>
         <div className="flex items-center gap-2">
-          <button
+          <Button
+            variant="secondary"
+            size="sm"
             onClick={() => void refresh()}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold disabled:opacity-50"
-            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}
-            title="Recargar"
+            iconLeft={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}
           >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Recargar
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="primary"
+            size="sm"
             onClick={exportCurrentTab}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white"
-            style={{ background: 'var(--br-amb)' }}
+            iconLeft={<Download className="h-4 w-4" />}
           >
-            <Download className="h-4 w-4" /> Exportar CSV
-          </button>
+            Exportar CSV
+          </Button>
         </div>
       </div>
 
@@ -262,54 +263,42 @@ export function AnalyticsView({ storeId }: Props) {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Desde</label>
-            <div className="relative">
-              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: 'var(--br-txt2)' }} />
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => { setFrom(e.target.value); setPreset('custom'); }}
-                className="w-full pl-8 pr-2 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-              />
-            </div>
+            <Input
+              type="date"
+              value={from}
+              onChange={(e) => { setFrom(e.target.value); setPreset('custom'); }}
+              iconLeft={<Calendar className="h-3.5 w-3.5" />}
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Hasta</label>
-            <div className="relative">
-              <Calendar className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5" style={{ color: 'var(--br-txt2)' }} />
-              <input
-                type="date"
-                value={to}
-                onChange={(e) => { setTo(e.target.value); setPreset('custom'); }}
-                className="w-full pl-8 pr-2 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-              />
-            </div>
+            <Input
+              type="date"
+              value={to}
+              onChange={(e) => { setTo(e.target.value); setPreset('custom'); }}
+              iconLeft={<Calendar className="h-3.5 w-3.5" />}
+            />
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Tienda</label>
-            <select
+            <Select
               value={filterStoreId}
               onChange={(e) => setFilterStoreId(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             >
               <option value="">Todas</option>
               {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Empleado</label>
-            <select
+            <Select
               value={filterEmployeeId}
               onChange={(e) => setFilterEmployeeId(e.target.value)}
               disabled={tab === 'employees' || tab === 'cash'}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             >
               <option value="">Todos</option>
               {employees.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </select>
+            </Select>
           </div>
         </div>
       </div>
@@ -391,7 +380,7 @@ function SimpleTable<T>({ rows, columns, empty, rowKey }: {
   rowKey: (r: T, i: number) => string;
 }) {
   if (rows.length === 0) {
-    return <p className="text-sm py-8 text-center" style={{ color: 'var(--br-txt2)' }}>{empty}</p>;
+    return <EmptyState icon={BarChart2} title={empty} density="compact" />;
   }
   return (
     <div className="rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>

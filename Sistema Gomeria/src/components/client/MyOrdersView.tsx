@@ -120,8 +120,14 @@ export function MyOrdersView({ clientToken }: Props) {
               </div>
             </div>
             {selected.clientMessage && (
-              <div className="rounded-lg p-3" style={{ background: 'var(--br-amb-bg)', border: '1px solid var(--br-amb-bor)' }}>
-                <p className="text-xs font-semibold mb-1" style={{ color: 'var(--br-amb)' }}>Mensaje de la gomería</p>
+              <div
+                className="rounded-lg p-3"
+                role="note"
+                style={{ background: 'var(--br-warn-bg)', border: '1px solid var(--br-warn-bor)' }}
+              >
+                <p className="text-xs font-semibold mb-1 uppercase tracking-wide" style={{ color: 'var(--br-warn)' }}>
+                  Mensaje de la gomería
+                </p>
                 <p className="text-sm" style={{ color: 'var(--br-txt)' }}>{selected.clientMessage}</p>
               </div>
             )}

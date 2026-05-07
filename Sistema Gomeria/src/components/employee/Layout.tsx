@@ -97,7 +97,8 @@ export function EmployeeApp({ auth }: Props) {
     <div className="flex h-screen overflow-hidden" style={{ background: 'var(--br-bg)' }}>
       {/* Sidebar */}
       <aside
-        className="flex flex-col w-16 lg:w-52 flex-shrink-0 h-full"
+        aria-label="Navegación principal"
+        className="flex flex-col w-16 lg:w-56 flex-shrink-0 h-full"
         style={{ background: 'var(--br-dark)', borderRight: '1px solid #2a2520' }}
       >
         {/* Logo */}
@@ -120,21 +121,27 @@ export function EmployeeApp({ auth }: Props) {
 
         {/* Nav */}
         <nav className="flex-1 py-3 overflow-y-auto">
-          {visibleNavItems.map(({ id, label, Icon }) => (
-            <button
-              key={id}
-              onClick={() => setTab(id)}
-              className="w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left"
-              style={{
-                color: tab === id ? 'var(--br-amb)' : '#9a9590',
-                background: tab === id ? 'rgba(196,123,18,0.12)' : 'transparent',
-                borderLeft: tab === id ? '3px solid var(--br-amb)' : '3px solid transparent',
-              }}
-            >
-              <Icon className="h-5 w-5 flex-shrink-0" />
-              <span className="hidden lg:block text-sm font-medium">{label}</span>
-            </button>
-          ))}
+          {visibleNavItems.map(({ id, label, Icon }) => {
+            const active = tab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                aria-label={label}
+                aria-current={active ? 'page' : undefined}
+                title={label}
+                className="w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left"
+                style={{
+                  color: active ? 'var(--br-amb)' : '#9a9590',
+                  background: active ? 'rgba(196,123,18,0.12)' : 'transparent',
+                  borderLeft: active ? '3px solid var(--br-amb)' : '3px solid transparent',
+                }}
+              >
+                <Icon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />
+                <span className="hidden lg:block text-sm font-medium truncate">{label}</span>
+              </button>
+            );
+          })}
         </nav>
 
         {/* Switch operator + Logout */}
@@ -205,7 +212,7 @@ export function EmployeeApp({ auth }: Props) {
               {tab === 'clients'   && <ClientsView   addToast={addToast} />}
               {tab === 'accounts'  && <AccountsView  addToast={addToast} employeeId={operatorId} />}
               {tab === 'invoices'  && <InvoicesView  addToast={addToast} />}
-              {tab === 'orders'    && <OrdersView    addToast={addToast} />}
+              {tab === 'orders'    && <OrdersView    addToast={addToast} storeId={stores.activeStoreId} />}
               {tab === 'analytics' && <AnalyticsView storeId={stores.activeStoreId} />}
               {tab === 'settings'  && <SettingsView  auth={auth} addToast={addToast} activeStoreId={stores.activeStoreId} activeStoreName={stores.activeStore?.name} currentRole={current.employee?.role ?? null} />}
             </>

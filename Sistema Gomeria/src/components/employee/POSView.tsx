@@ -19,6 +19,8 @@ import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
 import { printReceipt } from '@/utils/printReceipt';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { Button, Select } from '@/components/ui';
 import { Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle, Lock, Printer, Bookmark, Inbox, Tag } from 'lucide-react';
 
 interface Props {
@@ -95,6 +97,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
   const [parking, setParking] = useState(false);
   const [parkedListOpen, setParkedListOpen] = useState(false);
   const [resumingParkedId, setResumingParkedId] = useState<string | null>(null);
+  const [parkedToDelete, setParkedToDelete] = useState<Receipt | null>(null);
   const [employeeNameById, setEmployeeNameById] = useState<Map<string, string>>(new Map());
 
   const reloadParked = useCallback(async () => {
@@ -553,15 +556,14 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }}
             />
           </div>
-          <select
+          <Select
             value={filterCat}
             onChange={(e) => setFilterCat(e.target.value)}
-            className="px-3 py-2 rounded-lg text-sm outline-none"
-            style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+            className="w-auto"
           >
             <option value="">Todas</option>
             {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-          </select>
+          </Select>
         </div>
 
         {/* Product grid */}
@@ -630,11 +632,11 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
                 <p className="text-xs font-mono" style={{ color: 'var(--br-txt2)' }}>{ci.tire.size}</p>
                 <div className="flex items-center justify-between mt-2">
                   <div className="flex items-center gap-1">
-                    <button onClick={() => updateQty(ci.tire.id, -1)} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
+                    <button onClick={() => updateQty(ci.tire.id, -1)} aria-label={`Restar ${ci.tire.brand} ${ci.tire.size}`} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
                       <Minus className="h-3 w-3" />
                     </button>
                     <span className="w-6 text-center text-sm font-semibold">{ci.quantity}</span>
-                    <button onClick={() => updateQty(ci.tire.id, 1)} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
+                    <button onClick={() => updateQty(ci.tire.id, 1)} aria-label={`Sumar ${ci.tire.brand} ${ci.tire.size}`} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
                       <Plus className="h-3 w-3" />
                     </button>
                   </div>
@@ -654,15 +656,13 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
               Cliente (opcional)
             </label>
-            <select
+            <Select
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             >
               <option value="">Sin cliente</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
             {loyalty.enabled && selectedCustomer && customerPointsBalance > 0 && (
               <div className="mt-2">
                 <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
@@ -692,18 +692,16 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
               Método de pago
             </label>
-            <select
+            <Select
               value={paymentMethodId}
               onChange={(e) => setPaymentMethodId(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             >
               {paymentMethods.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}{p.surchargePercent > 0 ? ` (+${p.surchargePercent}%)` : ''}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           {canDiscount && discounts.length > 0 && (
@@ -711,11 +709,9 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1 flex items-center gap-1" style={{ color: 'var(--br-txt2)' }}>
                 <Tag className="h-3 w-3" /> Descuento
               </label>
-              <select
+              <Select
                 value={ticketDiscountId}
                 onChange={(e) => { setTicketDiscountId(e.target.value); setPendingDiscountValue(''); }}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               >
                 <option value="">Sin descuento</option>
                 {discounts.map((d) => (
@@ -726,7 +722,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
                       : ' · pedir valor'}
                   </option>
                 ))}
-              </select>
+              </Select>
               {ticketDiscount && ticketDiscount.value === null && (
                 <input
                   type="number"
@@ -783,34 +779,37 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
             </div>
           </div>
 
-          <button
+          <Button
+            variant="success"
+            size="lg"
+            fullWidth
             onClick={checkout}
             disabled={!canCheckout}
-            className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-opacity disabled:opacity-40"
-            style={{ background: 'var(--br-amb)' }}
             title={!cashSession ? 'Abrí la caja primero' : ''}
           >
             Cobrar {formatCurrency(total)}
-          </button>
+          </Button>
 
           <div className="grid grid-cols-2 gap-2">
-            <button
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft={<Bookmark className="h-3.5 w-3.5" />}
               onClick={openPark}
               disabled={cart.length === 0 || !cashSession}
-              className="py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40"
-              style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}
               title="Guardar ticket abierto (sin cobrar)"
+              fullWidth
             >
-              <Bookmark className="h-3.5 w-3.5" />
               Guardar ticket
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              iconLeft={<Inbox className="h-3.5 w-3.5" />}
               onClick={() => setParkedListOpen(true)}
-              className="py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 relative"
-              style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}
               title="Ver tickets abiertos"
+              fullWidth
             >
-              <Inbox className="h-3.5 w-3.5" />
               Tickets abiertos
               {parkedTickets.length > 0 && (
                 <span
@@ -820,7 +819,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
                   {parkedTickets.length}
                 </span>
               )}
-            </button>
+            </Button>
           </div>
 
           {resumingParkedId && (
@@ -851,12 +850,12 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setCheckoutOpen(false)} disabled={confirming} className="px-4 py-2 rounded-lg text-sm disabled:opacity-50" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>
+          <Button variant="secondary" onClick={() => setCheckoutOpen(false)} disabled={confirming}>
             Cancelar
-          </button>
-          <button onClick={confirmSale} disabled={confirming} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-grn)' }}>
-            {confirming ? 'Registrando...' : 'Confirmar venta'}
-          </button>
+          </Button>
+          <Button variant="success" onClick={confirmSale} loading={confirming}>
+            Confirmar venta
+          </Button>
         </div>
       </Modal>
 
@@ -877,7 +876,9 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
           )}
         </div>
         <div className="flex justify-center gap-2 mt-2">
-          <button
+          <Button
+            variant="secondary"
+            iconLeft={<Printer className="h-4 w-4" />}
             onClick={() => {
               if (!lastReceiptData || !store) return;
               printReceipt({
@@ -892,14 +893,12 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               });
             }}
             disabled={!lastReceiptData || !store}
-            className="px-4 py-2 rounded-lg text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
-            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}
           >
-            <Printer className="h-4 w-4" /> Imprimir
-          </button>
-          <button onClick={() => setSuccessOpen(false)} className="px-6 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-dark)' }}>
+            Imprimir
+          </Button>
+          <Button variant="primary" onClick={() => setSuccessOpen(false)}>
             Continuar
-          </button>
+          </Button>
         </div>
       </Modal>
 
@@ -931,12 +930,12 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setParkOpen(false)} disabled={parking} className="px-4 py-2 rounded-lg text-sm disabled:opacity-50" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>
+          <Button variant="secondary" onClick={() => setParkOpen(false)} disabled={parking}>
             Cancelar
-          </button>
-          <button onClick={confirmPark} disabled={parking || !parkName.trim()} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
-            {parking ? 'Guardando...' : 'Guardar'}
-          </button>
+          </Button>
+          <Button variant="primary" onClick={confirmPark} loading={parking} disabled={parking || !parkName.trim()}>
+            Guardar
+          </Button>
         </div>
       </Modal>
 
@@ -971,25 +970,22 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
                     </p>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button
+                    <Button
+                      variant="success"
+                      size="sm"
                       onClick={() => void resumeParked(p)}
-                      className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
-                      style={{ background: 'var(--br-grn)' }}
                     >
                       Reanudar
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (window.confirm(`¿Eliminar ticket "${p.parkedName ?? p.receiptNumber}"?`)) {
-                          void deleteParked(p.id);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg"
-                      style={{ color: 'var(--br-red)', border: '1px solid var(--br-bor)' }}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setParkedToDelete(p)}
+                      aria-label={`Eliminar ticket ${p.parkedName ?? p.receiptNumber}`}
                       title="Eliminar"
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                      <Trash2 className="h-4 w-4" style={{ color: 'var(--br-red)' }} />
+                    </Button>
                   </div>
                 </div>
               );
@@ -997,15 +993,26 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
           </div>
         )}
         <div className="flex justify-end mt-4">
-          <button
-            onClick={() => setParkedListOpen(false)}
-            className="px-4 py-2 rounded-lg text-sm"
-            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}
-          >
+          <Button variant="secondary" onClick={() => setParkedListOpen(false)}>
             Cerrar
-          </button>
+          </Button>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={parkedToDelete !== null}
+        onClose={() => setParkedToDelete(null)}
+        onConfirm={() => {
+          if (parkedToDelete) {
+            void deleteParked(parkedToDelete.id);
+            setParkedToDelete(null);
+          }
+        }}
+        title="Eliminar ticket abierto"
+        message={`Se descartará "${parkedToDelete?.parkedName ?? parkedToDelete?.receiptNumber ?? ''}". Esta acción no se puede deshacer.`}
+        type="danger"
+        confirmText="Eliminar"
+      />
     </div>
   );
 }

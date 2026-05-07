@@ -4,7 +4,7 @@ import { customerServiceV2 } from '@/services/customerServiceV2';
 import { supabase } from '@/services/supabaseClient';
 import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
-import { Modal } from '@/components/ui/Modal';
+import { Modal, Input } from '@/components/ui';
 import { Search, Plus, Minus, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface Props {
@@ -145,15 +145,13 @@ export function AccountsView({ addToast, employeeId }: Props) {
       <div className="grid lg:grid-cols-3 gap-4">
         {/* Customer list */}
         <div className="lg:col-span-1">
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--br-txt2)' }} />
-            <input
+          <div className="mb-3">
+            <Input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar cliente..."
-              className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }}
+              iconLeft={<Search className="h-4 w-4" />}
             />
           </div>
           <div className="space-y-2">

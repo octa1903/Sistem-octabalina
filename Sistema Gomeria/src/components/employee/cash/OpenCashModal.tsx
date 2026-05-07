@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
+import { Button, FormField, Input } from '@/components/ui';
 import { formatCurrency } from '@/utils/currency';
 import { LockOpen } from 'lucide-react';
 
@@ -47,34 +48,25 @@ export function OpenCashModal({ open, storeName, onClose, onConfirm }: Props) {
         <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
           Tienda: <strong style={{ color: 'var(--br-txt)' }}>{storeName}</strong>
         </p>
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
-            Monto de apertura
-          </label>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--br-txt2)' }}>$</span>
-            <input
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              autoFocus
-              disabled={submitting}
-              className="w-full pl-7 pr-3 py-2.5 rounded-lg text-sm outline-none"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-              onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-              onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')}
-            />
-          </div>
-          {valid && parsed > 0 && (
-            <p className="text-xs mt-1" style={{ color: 'var(--br-txt2)' }}>
-              {formatCurrency(parsed)}
-            </p>
-          )}
-        </div>
+        <FormField label="Monto inicial" required>
+          <Input
+            type="number"
+            inputMode="decimal"
+            min={0}
+            step="0.01"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0"
+            autoFocus
+            disabled={submitting}
+            iconLeft={<span className="text-sm">$</span>}
+          />
+        </FormField>
+        {valid && parsed > 0 && (
+          <p className="text-xs mt-1" style={{ color: 'var(--br-txt2)' }}>
+            {formatCurrency(parsed)}
+          </p>
+        )}
 
         {error && (
           <p className="text-sm rounded-lg px-3 py-2"
@@ -84,25 +76,26 @@ export function OpenCashModal({ open, storeName, onClose, onConfirm }: Props) {
         )}
 
         <div className="flex justify-end gap-2 pt-1">
-          <button
+          <Button
             type="button"
+            variant="secondary"
             onClick={() => { reset(); onClose(); }}
             disabled={submitting}
-            className="px-4 py-2 rounded-lg text-sm disabled:opacity-50"
-            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}
           >
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            variant="success"
+            size="lg"
+            fullWidth
+            iconLeft={<LockOpen className="h-4 w-4" />}
             onClick={handleConfirm}
+            loading={submitting}
             disabled={submitting || !valid}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-50"
-            style={{ background: '#15803d' }}
           >
-            <LockOpen className="h-4 w-4" />
-            {submitting ? 'Abriendo...' : 'Abrir caja'}
-          </button>
+            Abrir caja
+          </Button>
         </div>
       </div>
     </Modal>

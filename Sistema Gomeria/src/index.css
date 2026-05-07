@@ -17,12 +17,72 @@
   --br-grn-bg: #e8f5ee;
   --br-grn-bor: #90d4a8;
   --br-dark: #1a1814;
+  --br-info: #2563eb;
+  --br-info-bg: #e6efff;
+  --br-info-bor: #a8c4f5;
+  --br-warn: #b45309;
+  --br-warn-bg: #fef3c7;
+  --br-warn-bor: #fbbf24;
+  --br-shadow-sm: 0 1px 2px rgba(26, 24, 20, 0.05);
+  --br-shadow-md: 0 4px 12px rgba(26, 24, 20, 0.08);
+  --br-shadow-lg: 0 10px 30px rgba(26, 24, 20, 0.12);
+  --br-radius-sm: 0.5rem;
+  --br-radius-md: 0.75rem;
+  --br-radius-lg: 1rem;
+
+  --br-primary: var(--br-amb);
+  --br-primary-bg: var(--br-amb-bg);
+  --br-primary-bor: var(--br-amb-bor);
+  --br-success: var(--br-grn);
+  --br-success-bg: var(--br-grn-bg);
+  --br-success-bor: var(--br-grn-bor);
+  --br-danger: var(--br-red);
+  --br-danger-bg: var(--br-red-bg);
+  --br-danger-bor: var(--br-red-bor);
+}
+
+@theme {
+  --color-primary: #c47b12;
+  --color-primary-bg: #fdf3e0;
+  --color-primary-bor: #f0c060;
+  --color-success: #2e7d4f;
+  --color-success-bg: #e8f5ee;
+  --color-success-bor: #90d4a8;
+  --color-danger: #c0362a;
+  --color-danger-bg: #fdecea;
+  --color-danger-bor: #f0a099;
+  --color-info: #2563eb;
+  --color-info-bg: #e6efff;
+  --color-info-bor: #a8c4f5;
+  --color-warn: #b45309;
+  --color-warn-bg: #fef3c7;
+  --color-warn-bor: #fbbf24;
+  --color-surface: #ffffff;
+  --color-surface-2: #f0ede6;
+  --color-base-bg: #f7f5f0;
+  --color-base-bor: #e2ddd4;
+  --color-base-txt: #1a1814;
+  --color-base-txt2: #7a7569;
+}
+
+/* Escala global del sistema. Tailwind usa rem para spacing/tipografía/iconos,
+   así que subir la raíz agranda todo proporcionalmente sin tocar componentes.
+   16px (default) → 19px (~19% más grande). Pensado para uso en TPV de
+   gomería: pantallas a ~70cm con manos sucias y poca luz.
+
+   Escala oficial de spacing (clases Tailwind permitidas): 1, 2, 3, 4, 6, 8, 12.
+   = 4 / 8 / 12 / 16 / 24 / 32 / 48 px (a base 19px crece proporcional).
+   Evitar 5, 7, 10, 11, 13+ (rompen el ritmo). */
+html {
+  font-size: 19px;
 }
 
 body {
   background-color: var(--br-bg);
   color: var(--br-txt);
   font-family: 'DM Sans', 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 * {
@@ -36,4 +96,16 @@ input[type='password'],
 select,
 textarea {
   font-family: inherit;
+}
+
+/* Foco accesible visible en navegación con teclado, oculto al usar mouse. */
+:focus-visible {
+  outline: 2px solid var(--br-amb);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+  outline: none;
 }

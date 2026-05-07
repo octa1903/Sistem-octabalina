@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
+import { Button, FormField, Input } from '@/components/ui';
 import { formatCurrency } from '@/utils/currency';
 import { Lock } from 'lucide-react';
 import type { CloseResult } from '@/hooks/useCashSession';
@@ -89,14 +90,9 @@ export function CloseCashModal({ open, session, storeName, onClose, onConfirm }:
             </p>
           )}
           <div className="flex justify-end pt-1">
-            <button
-              type="button"
-              onClick={handleFinish}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white"
-              style={{ background: 'var(--br-dark)' }}
-            >
+            <Button type="button" variant="primary" onClick={handleFinish}>
               Listo
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -107,34 +103,25 @@ export function CloseCashModal({ open, session, storeName, onClose, onConfirm }:
           <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
             Apertura: <span className="font-mono" style={{ color: 'var(--br-txt)' }}>{formatCurrency(session.openingFloat)}</span>
           </p>
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
-              Efectivo contado
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--br-txt2)' }}>$</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min={0}
-                step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
-                autoFocus
-                disabled={submitting}
-                className="w-full pl-7 pr-3 py-2.5 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-                onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-                onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')}
-              />
-            </div>
-            {valid && parsed > 0 && (
-              <p className="text-xs mt-1" style={{ color: 'var(--br-txt2)' }}>
-                {formatCurrency(parsed)}
-              </p>
-            )}
-          </div>
+          <FormField label="Efectivo contado">
+            <Input
+              type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+              autoFocus
+              disabled={submitting}
+              iconLeft={<span className="text-sm">$</span>}
+            />
+          </FormField>
+          {valid && parsed > 0 && (
+            <p className="text-xs mt-1" style={{ color: 'var(--br-txt2)' }}>
+              {formatCurrency(parsed)}
+            </p>
+          )}
 
           {error && (
             <p className="text-sm rounded-lg px-3 py-2"
@@ -144,25 +131,26 @@ export function CloseCashModal({ open, session, storeName, onClose, onConfirm }:
           )}
 
           <div className="flex justify-end gap-2 pt-1">
-            <button
+            <Button
               type="button"
+              variant="secondary"
               onClick={() => { reset(); onClose(); }}
               disabled={submitting}
-              className="px-4 py-2 rounded-lg text-sm disabled:opacity-50"
-              style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="danger"
+              size="lg"
+              fullWidth
+              iconLeft={<Lock className="h-4 w-4" />}
               onClick={handleConfirm}
+              loading={submitting}
               disabled={submitting || !valid}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white flex items-center gap-2 disabled:opacity-50"
-              style={{ background: 'var(--br-red)' }}
             >
-              <Lock className="h-4 w-4" />
-              {submitting ? 'Cerrando...' : 'Cerrar caja'}
-            </button>
+              Cerrar caja
+            </Button>
           </div>
         </div>
       )}

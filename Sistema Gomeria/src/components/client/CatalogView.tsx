@@ -9,7 +9,8 @@ import { storeService } from '@/services/storeService';
 import { TIRE_CATEGORIES, PAYMENT_METHODS, DEFAULT_ORDER_CONFIG } from '@/constants';
 import { formatCurrency } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
-import { Search, ShoppingCart, Plus, Minus, Trash2, CheckCircle } from 'lucide-react';
+import { Button, Input, Select, EmptyState } from '@/components/ui';
+import { Search, ShoppingCart, Plus, Minus, Trash2, CheckCircle, Package } from 'lucide-react';
 
 interface Props {
   clientId: string;
@@ -181,28 +182,34 @@ export function CatalogView({ clientId, clientToken, addToast }: Props) {
           )}
         </div>
         {cart.length > 0 && (
-          <button onClick={() => setOrderOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-semibold"
-            style={{ background: 'var(--br-amb)' }}>
-            <ShoppingCart className="h-4 w-4" /> Pedido ({cart.length}) · {formatCurrency(cartTotal)}
-          </button>
+          <Button
+            variant="primary"
+            onClick={() => setOrderOpen(true)}
+            iconLeft={<ShoppingCart className="h-4 w-4" />}
+          >
+            Pedido ({cart.length}) · {formatCurrency(cartTotal)}
+          </Button>
         )}
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--br-txt2)' }} />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+        <div className="flex-1 min-w-48">
+          <Input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por marca, modelo, medida..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
-            style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }} />
+            iconLeft={<Search className="h-4 w-4" />}
+          />
         </div>
-        <select value={filterCat} onChange={(e) => setFilterCat(e.target.value)}
-          className="px-3 py-2 rounded-lg text-sm outline-none"
-          style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
+        <Select
+          value={filterCat}
+          onChange={(e) => setFilterCat(e.target.value)}
+          className="w-auto"
+        >
           <option value="">Todas</option>
           {TIRE_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-        </select>
+        </Select>
       </div>
 
       {loading && (
@@ -231,11 +238,14 @@ export function CatalogView({ clientId, clientToken, addToast }: Props) {
                   )}
                 </div>
                 {!inCart ? (
-                  <button onClick={() => addToCart(t)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white"
-                    style={{ background: 'var(--br-amb)' }}>
-                    <Plus className="h-4 w-4" /> Agregar
-                  </button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => addToCart(t)}
+                    iconLeft={<Plus className="h-4 w-4" />}
+                  >
+                    Agregar
+                  </Button>
                 ) : (
                   <div className="flex items-center gap-2">
                     <button onClick={() => updateQty(t.id, -1)} className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)' }}>
@@ -252,7 +262,14 @@ export function CatalogView({ clientId, clientToken, addToast }: Props) {
           );
         })}
         {!loading && filtered.length === 0 && (
-          <p className="col-span-3 text-sm text-center py-10" style={{ color: 'var(--br-txt2)' }}>Sin productos disponibles.</p>
+          <div className="col-span-3">
+            <EmptyState
+              icon={Package}
+              title="Sin productos disponibles"
+              description="No hay neumáticos que coincidan con tu búsqueda."
+              density="compact"
+            />
+          </div>
         )}
       </div>
 
@@ -302,9 +319,12 @@ export function CatalogView({ clientId, clientToken, addToast }: Props) {
           {orderType === 'entrega_domicilio' && (
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Dirección</label>
-              <input type="text" value={orderAddress} onChange={(e) => setOrderAddress(e.target.value)}
-                placeholder="Calle, número, ciudad..." className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
+              <Input
+                type="text"
+                value={orderAddress}
+                onChange={(e) => setOrderAddress(e.target.value)}
+                placeholder="Calle, número, ciudad..."
+              />
             </div>
           )}
 
@@ -312,36 +332,37 @@ export function CatalogView({ clientId, clientToken, addToast }: Props) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Fecha</label>
-              <input type="date" value={orderDate} min={minDate} onChange={(e) => setOrderDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
+              <Input
+                type="date"
+                value={orderDate}
+                min={minDate}
+                onChange={(e) => setOrderDate(e.target.value)}
+              />
             </div>
             <div>
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Horario</label>
-              <select value={orderTime} onChange={(e) => setOrderTime(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
+              <Select value={orderTime} onChange={(e) => setOrderTime(e.target.value)}>
                 <option value="">A coordinar</option>
                 {orderConfig.timeSlots.map((ts) => <option key={ts} value={ts}>{ts}</option>)}
-              </select>
+              </Select>
             </div>
           </div>
 
           {/* Payment */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Pago (referencia)</label>
-            <select value={orderPayment} onChange={(e) => setOrderPayment(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
+            <Select value={orderPayment} onChange={(e) => setOrderPayment(e.target.value)}>
               {PAYMENT_METHODS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-            </select>
+            </Select>
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setOrderOpen(false)} disabled={submitting} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={submitOrder} disabled={submitting} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
-            {submitting ? 'Enviando…' : 'Confirmar pedido'}
-          </button>
+          <Button variant="secondary" onClick={() => setOrderOpen(false)} disabled={submitting}>
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={submitOrder} loading={submitting}>
+            Confirmar pedido
+          </Button>
         </div>
       </Modal>
 
@@ -353,9 +374,9 @@ export function CatalogView({ clientId, clientToken, addToast }: Props) {
           <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>Tu pedido fue recibido. Te contactaremos para confirmar.</p>
         </div>
         <div className="text-center mt-2">
-          <button onClick={() => setSuccessOpen(false)} className="px-6 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-amb)' }}>
+          <Button variant="primary" onClick={() => setSuccessOpen(false)}>
             Continuar →
-          </button>
+          </Button>
         </div>
       </Modal>
     </div>

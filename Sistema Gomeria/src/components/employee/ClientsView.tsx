@@ -7,6 +7,7 @@ import { sha256 } from '@/utils/hash';
 import { Modal } from '@/components/ui/Modal';
 import { ImportModal } from '@/components/employee/import/ImportModal';
 import { Plus, Search, Edit2, Trash2, User, Phone, MapPin, Upload } from 'lucide-react';
+import { Button, IconButton, Input, Select, FormField, EmptyState, ConfirmDialog } from '@/components/ui';
 
 interface Props { addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void; }
 
@@ -43,6 +44,7 @@ export function ClientsView({ addToast }: Props) {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Client | null>(null);
   const [form, setForm] = useState<ClientForm>({ ...EMPTY_FORM });
+  const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<Client | null>(null);
   const [detailClient, setDetailClient] = useState<Client | null>(null);
 
@@ -75,7 +77,7 @@ export function ClientsView({ addToast }: Props) {
   async function save() {
     if (!form.name.trim()) { addToast('El nombre es obligatorio.', 'error'); return; }
     let pinHash: string;
-
+    setSaving(true);
     try {
       if (editing) {
         pinHash = form.pin ? await sha256(form.pin) : editing.pinHash;
@@ -109,6 +111,8 @@ export function ClientsView({ addToast }: Props) {
       addToast(editing ? 'Cliente actualizado.' : 'Cliente creado.', 'success');
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error guardando cliente.', 'error');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -124,114 +128,117 @@ export function ClientsView({ addToast }: Props) {
     }
   }
 
-  const field = (label: string, node: React.ReactNode) => (
-    <div>
-      <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>{label}</label>
-      {node}
-    </div>
-  );
-
-  const inp = (key: keyof ClientForm, type = 'text', placeholder?: string) => (
-    <input
-      type={type}
-      value={form[key] as string | number}
-      onChange={(e) => setForm({ ...form, [key]: type === 'number' ? Number(e.target.value) : e.target.value })}
-      placeholder={placeholder}
-      className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-      style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-      onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-      onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')}
-    />
-  );
-
   return (
-    <div className="p-5 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div className="p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Clientes</h1>
           <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>{clients.length} clientes registrados</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setImportOpen(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold"
-            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}
-          >
-            <Upload className="h-4 w-4" /> Importar
-          </button>
-          <button onClick={openNew} className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-semibold" style={{ background: 'var(--br-amb)' }}>
-            <Plus className="h-4 w-4" /> Nuevo cliente
-          </button>
+          <Button variant="secondary" iconLeft={<Upload className="h-4 w-4" />} onClick={() => setImportOpen(true)}>
+            Importar
+          </Button>
+          <Button variant="primary" iconLeft={<Plus className="h-4 w-4" />} onClick={openNew}>
+            Nuevo cliente
+          </Button>
         </div>
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--br-txt2)' }} />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+        <div className="flex-1 min-w-48">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre, teléfono..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
-            style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }} />
+            iconLeft={<Search className="h-4 w-4" />}
+          />
         </div>
-        <select value={filterType} onChange={(e) => setFilterType(e.target.value as typeof filterType)}
-          className="px-3 py-2 rounded-lg text-sm outline-none"
-          style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
+        <Select
+          value={filterType}
+          onChange={(e) => setFilterType(e.target.value as typeof filterType)}
+          className="w-auto"
+        >
           <option value="">Todos</option>
           <option value="minorista">Minorista</option>
           <option value="mayorista">Mayorista</option>
-        </select>
+        </Select>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((c) => (
-          <div key={c.id} className="rounded-xl p-4 cursor-pointer transition-all"
-            style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
-            onClick={() => setDetailClient(c)}
-            onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--br-amb)')}
-            onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--br-bor)')}
-          >
-            <div className="flex items-start justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
-                  style={{ background: c.tipoCliente === 'mayorista' ? 'var(--br-amb)' : 'var(--br-dark)' }}>
-                  {c.name.charAt(0).toUpperCase()}
+      {filtered.length === 0 ? (
+        <div className="col-span-3">
+          <EmptyState
+            icon={User}
+            title={loading ? 'Cargando clientes...' : clients.length === 0 ? 'No hay clientes registrados' : 'Sin resultados'}
+            description={
+              loading
+                ? undefined
+                : clients.length === 0
+                ? 'Creá el primer cliente con el botón "Nuevo cliente".'
+                : 'Probá con otro término de búsqueda o cambiá el filtro.'
+            }
+            action={
+              !loading && clients.length === 0 ? (
+                <Button variant="primary" iconLeft={<Plus className="h-4 w-4" />} onClick={openNew}>
+                  Nuevo cliente
+                </Button>
+              ) : undefined
+            }
+          />
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {filtered.map((c) => (
+            <div key={c.id} className="rounded-xl p-4 cursor-pointer transition-all"
+              style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
+              onClick={() => setDetailClient(c)}
+              onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--br-amb)')}
+              onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--br-bor)')}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
+                    style={{ background: c.tipoCliente === 'mayorista' ? 'var(--br-amb)' : 'var(--br-dark)' }}>
+                    {c.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm" style={{ color: 'var(--br-txt)' }}>{c.name}</p>
+                    <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
+                      style={{ background: c.tipoCliente === 'mayorista' ? 'var(--br-amb-bg)' : 'var(--br-sur2)', color: c.tipoCliente === 'mayorista' ? 'var(--br-amb)' : 'var(--br-txt2)' }}>
+                      {c.tipoCliente === 'mayorista' ? 'Mayorista' : 'Minorista'}
+                    </span>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-semibold text-sm" style={{ color: 'var(--br-txt)' }}>{c.name}</p>
-                  <span className="text-xs px-1.5 py-0.5 rounded-full font-medium"
-                    style={{ background: c.tipoCliente === 'mayorista' ? 'var(--br-amb-bg)' : 'var(--br-sur2)', color: c.tipoCliente === 'mayorista' ? 'var(--br-amb)' : 'var(--br-txt2)' }}>
-                    {c.tipoCliente === 'mayorista' ? 'Mayorista' : 'Minorista'}
-                  </span>
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                  <IconButton
+                    label="Editar cliente"
+                    icon={<Edit2 className="h-4 w-4" />}
+                    tone="neutral"
+                    size="sm"
+                    bordered={false}
+                    onClick={() => openEdit(c)}
+                  />
+                  <IconButton
+                    label="Eliminar cliente"
+                    icon={<Trash2 className="h-4 w-4" />}
+                    tone="danger"
+                    size="sm"
+                    bordered={false}
+                    onClick={() => setDeleting(c)}
+                  />
                 </div>
               </div>
-              <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-                <button onClick={() => openEdit(c)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }}
-                  onMouseOver={(e) => (e.currentTarget.style.color = 'var(--br-amb)')}
-                  onMouseOut={(e) => (e.currentTarget.style.color = 'var(--br-txt2)')}>
-                  <Edit2 className="h-4 w-4" />
-                </button>
-                <button onClick={() => setDeleting(c)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }}
-                  onMouseOver={(e) => (e.currentTarget.style.color = 'var(--br-red)')}
-                  onMouseOut={(e) => (e.currentTarget.style.color = 'var(--br-txt2)')}>
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
+              {c.phone && <p className="text-xs flex items-center gap-1 mt-1" style={{ color: 'var(--br-txt2)' }}><Phone className="h-3 w-3" /> {c.phone}</p>}
+              {c.address && <p className="text-xs flex items-center gap-1 mt-0.5 truncate" style={{ color: 'var(--br-txt2)' }}><MapPin className="h-3 w-3" /> {c.address}</p>}
+              {c.balance !== 0 && (
+                <p className="text-sm font-semibold mt-2 font-mono" style={{ color: c.balance > 0 ? 'var(--br-red)' : 'var(--br-grn)' }}>
+                  {c.balance > 0 ? 'Debe: ' : 'Favor: '}{formatCurrency(Math.abs(c.balance))}
+                </p>
+              )}
             </div>
-            {c.phone && <p className="text-xs flex items-center gap-1 mt-1" style={{ color: 'var(--br-txt2)' }}><Phone className="h-3 w-3" /> {c.phone}</p>}
-            {c.address && <p className="text-xs flex items-center gap-1 mt-0.5 truncate" style={{ color: 'var(--br-txt2)' }}><MapPin className="h-3 w-3" /> {c.address}</p>}
-            {c.balance !== 0 && (
-              <p className="text-sm font-semibold mt-2 font-mono" style={{ color: c.balance > 0 ? 'var(--br-red)' : 'var(--br-grn)' }}>
-                {c.balance > 0 ? 'Debe: ' : 'Favor: '}{formatCurrency(Math.abs(c.balance))}
-              </p>
-            )}
-          </div>
-        ))}
-        {filtered.length === 0 && (
-          <p className="col-span-3 text-sm py-10 text-center" style={{ color: 'var(--br-txt2)' }}>
-            {loading ? 'Cargando clientes...' : clients.length === 0 ? 'No hay clientes registrados.' : 'Sin resultados.'}
-          </p>
-        )}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Import modal */}
       <ImportModal
@@ -247,31 +254,74 @@ export function ClientsView({ addToast }: Props) {
       {/* Form modal */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar cliente' : 'Nuevo cliente'} size="md">
         <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">{field('Nombre *', inp('name'))}</div>
-          {field('Teléfono', inp('phone', 'tel'))}
-          {field('Email', inp('email', 'email'))}
-          <div className="col-span-2">{field('Dirección', inp('address'))}</div>
-          {field('Tipo', (
-            <select value={form.tipoCliente} onChange={(e) => setForm({ ...form, tipoCliente: e.target.value as 'minorista' | 'mayorista' })}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
+          <div className="col-span-2">
+            <FormField label="Nombre" required>
+              <Input
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
+              />
+            </FormField>
+          </div>
+          <FormField label="Teléfono">
+            <Input
+              type="tel"
+              value={form.phone}
+              onChange={(e) => setForm({ ...form, phone: e.target.value })}
+            />
+          </FormField>
+          <FormField label="Email">
+            <Input
+              type="email"
+              value={form.email}
+              onChange={(e) => setForm({ ...form, email: e.target.value })}
+            />
+          </FormField>
+          <div className="col-span-2">
+            <FormField label="Dirección">
+              <Input
+                value={form.address}
+                onChange={(e) => setForm({ ...form, address: e.target.value })}
+              />
+            </FormField>
+          </div>
+          <FormField label="Tipo">
+            <Select
+              value={form.tipoCliente}
+              onChange={(e) => setForm({ ...form, tipoCliente: e.target.value as 'minorista' | 'mayorista' })}
+            >
               <option value="minorista">Minorista</option>
               <option value="mayorista">Mayorista</option>
-            </select>
-          ))}
-          {field('Cupo crédito ($)', inp('cupoCredito', 'number'))}
-          {form.tipoCliente === 'mayorista' && field('Descuento mayorista (%)', inp('descuentoMayorista', 'number'))}
-          {field('PIN ' + (editing ? '(vacío = no cambiar)' : '(por defecto: 1234)'), (
-            <input type="password" value={form.pin}
+            </Select>
+          </FormField>
+          <FormField label="Cupo crédito ($)">
+            <Input
+              type="number"
+              value={form.cupoCredito}
+              onChange={(e) => setForm({ ...form, cupoCredito: Number(e.target.value) })}
+            />
+          </FormField>
+          {form.tipoCliente === 'mayorista' && (
+            <FormField label="Descuento mayorista (%)">
+              <Input
+                type="number"
+                value={form.descuentoMayorista}
+                onChange={(e) => setForm({ ...form, descuentoMayorista: Number(e.target.value) })}
+              />
+            </FormField>
+          )}
+          <FormField label={`PIN ${editing ? '(vacío = no cambiar)' : '(por defecto: 1234)'}`}>
+            <Input
+              type="password"
+              value={form.pin}
               onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '') })}
-              placeholder={editing ? '••••' : '1234'} maxLength={8}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }} />
-          ))}
+              placeholder={editing ? '••••' : '1234'}
+              maxLength={8}
+            />
+          </FormField>
         </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setModalOpen(false)} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={save} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-amb)' }}>Guardar</button>
+        <div className="flex justify-end gap-2 mt-6">
+          <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancelar</Button>
+          <Button variant="primary" loading={saving} onClick={() => { void save(); }}>Guardar</Button>
         </div>
       </Modal>
 
@@ -309,13 +359,16 @@ export function ClientsView({ addToast }: Props) {
       </Modal>
 
       {/* Delete confirm */}
-      <Modal open={!!deleting} onClose={() => setDeleting(null)} title="Eliminar cliente" size="sm">
-        <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>¿Eliminar a <strong>{deleting?.name}</strong>? Esta acción no se puede deshacer.</p>
-        <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setDeleting(null)} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={confirmDelete} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-red)' }}>Eliminar</button>
-        </div>
-      </Modal>
+      <ConfirmDialog
+        open={!!deleting}
+        onClose={() => setDeleting(null)}
+        onConfirm={() => { void confirmDelete(); }}
+        title="Eliminar cliente"
+        message={`¿Eliminar a ${deleting?.name ?? ''}? Esta acción no se puede deshacer.`}
+        type="danger"
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+      />
     </div>
   );
 }
