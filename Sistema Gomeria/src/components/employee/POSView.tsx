@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type {
   TireV2, TireStoreOverride, Category, Customer, PaymentMethod, CashSession, Tax, Store, ReceiptConfig,
   Receipt, ReceiptLine, Discount,
@@ -86,6 +86,11 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
   const [pointsToRedeem, setPointsToRedeem] = useState<string>('');
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  // Guard sincrónico contra doble-tap: setConfirming(true) recién aplica
+  // en el siguiente frame, dejando una ventana donde dos taps rápidos
+  // pueden disparar dos ventas. La ref bloquea desde el primer click.
+  const confirmingRef = useRef(false);
+  const [clearCartConfirm, setClearCartConfirm] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [lastReceipt, setLastReceipt] = useState<{ number: string; total: number; pmName: string } | null>(null);
   const [lastReceiptData, setLastReceiptData] = useState<LastReceiptData | null>(null);
@@ -328,12 +333,14 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
   }
 
   async function confirmSale() {
+    if (confirmingRef.current) return;
     if (!cashSession || !employeeId || !selectedPm) return;
     const resolvedDiscount = resolvedTicketDiscount();
     if (ticketDiscount && !resolvedDiscount) {
       addToast('Ingresá el valor del descuento.', 'warning');
       return;
     }
+    confirmingRef.current = true;
     setConfirming(true);
     try {
       const input: BuildReceiptInput = {
@@ -402,6 +409,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
       addToast(e instanceof Error ? e.message : 'Error registrando venta.', 'error');
     } finally {
       setConfirming(false);
+      confirmingRef.current = false;
     }
   }
 
@@ -569,7 +577,17 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         {/* Product grid */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <p className="text-sm py-10 text-center" style={{ color: 'var(--br-txt2)' }}>Cargando...</p>
+            // Skeleton: la grilla queda con la misma forma que la final, así
+            // el operador percibe respuesta inmediata aunque Supabase tarde.
+            <div className="grid grid-cols-2 xl:grid-cols-3 gap-2" aria-busy="true" aria-label="Cargando neumáticos">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="rounded-xl p-3 animate-pulse"
+                  style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)', height: '116px' }}
+                />
+              ))}
+            </div>
           ) : (
             <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
               {filtered.map((row) => (
@@ -609,14 +627,27 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
 
       {/* Cart panel */}
       <div className="w-80 flex flex-col" style={{ background: 'var(--br-sur)', borderLeft: '1px solid var(--br-bor)' }}>
-        <div className="px-4 py-4 flex items-center gap-2" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-          <ShoppingCart className="h-5 w-5" style={{ color: 'var(--br-amb)' }} />
-          <span className="font-semibold text-sm" style={{ color: 'var(--br-txt)' }}>Carrito ({cart.length})</span>
+        <div className="px-4 py-4 flex items-center justify-between gap-2" style={{ borderBottom: '1px solid var(--br-bor)' }}>
+          <div className="flex items-center gap-2 min-w-0">
+            <ShoppingCart className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--br-amb)' }} />
+            <span className="font-semibold text-sm" style={{ color: 'var(--br-txt)' }}>Carrito ({cart.length})</span>
+          </div>
+          {cart.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setClearCartConfirm(true)}
+              className="text-xs font-medium px-2 py-1 rounded hover:opacity-80"
+              style={{ color: 'var(--br-red)' }}
+              title="Vaciar carrito"
+            >
+              Vaciar
+            </button>
+          )}
         </div>
 
         {!cashSession && (
           <div className="mx-3 mt-3 p-3 rounded-lg flex items-start gap-2"
-               style={{ background: 'rgba(220,38,38,0.08)', border: '1px solid rgba(220,38,38,0.30)', color: 'var(--br-red)' }}>
+               style={{ background: 'var(--br-red-bg)', border: '1px solid var(--br-red-bor)', color: 'var(--br-red)' }}>
             <Lock className="h-4 w-4 mt-0.5 flex-shrink-0" />
             <span className="text-xs">Abrí la caja para vender. Botón "Abrir caja" arriba.</span>
           </div>
@@ -630,19 +661,38 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               <div key={ci.tire.id} className="rounded-lg p-3" style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)' }}>
                 <p className="text-xs font-medium" style={{ color: 'var(--br-txt)' }}>{ci.tire.brand} {ci.tire.model}</p>
                 <p className="text-xs font-mono" style={{ color: 'var(--br-txt2)' }}>{ci.tire.size}</p>
-                <div className="flex items-center justify-between mt-2">
+                {/* Targets táctiles 44px (mín. para guantes/manos sucias). */}
+                <div className="flex items-center justify-between mt-2 gap-2">
                   <div className="flex items-center gap-1">
-                    <button onClick={() => updateQty(ci.tire.id, -1)} aria-label={`Restar ${ci.tire.brand} ${ci.tire.size}`} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-                      <Minus className="h-3 w-3" />
+                    <button
+                      type="button"
+                      onClick={() => updateQty(ci.tire.id, -1)}
+                      aria-label={`Restar ${ci.tire.brand} ${ci.tire.size}`}
+                      className="w-11 h-11 rounded flex items-center justify-center active:opacity-70"
+                      style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
+                    >
+                      <Minus className="h-4 w-4" />
                     </button>
-                    <span className="w-6 text-center text-sm font-semibold">{ci.quantity}</span>
-                    <button onClick={() => updateQty(ci.tire.id, 1)} aria-label={`Sumar ${ci.tire.brand} ${ci.tire.size}`} className="w-6 h-6 rounded flex items-center justify-center" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-                      <Plus className="h-3 w-3" />
+                    <span className="w-8 text-center text-sm font-semibold tabular-nums">{ci.quantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => updateQty(ci.tire.id, 1)}
+                      aria-label={`Sumar ${ci.tire.brand} ${ci.tire.size}`}
+                      className="w-11 h-11 rounded flex items-center justify-center active:opacity-70"
+                      style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
+                    >
+                      <Plus className="h-4 w-4" />
                     </button>
                   </div>
                   <span className="text-sm font-semibold font-mono" style={{ color: 'var(--br-amb)' }}>{formatCurrency(ci.subtotal)}</span>
-                  <button onClick={() => setCart((p) => p.filter((i) => i.tire.id !== ci.tire.id))} style={{ color: 'var(--br-txt2)' }}>
-                    <Trash2 className="h-4 w-4" />
+                  <button
+                    type="button"
+                    onClick={() => setCart((p) => p.filter((i) => i.tire.id !== ci.tire.id))}
+                    aria-label={`Quitar ${ci.tire.brand} ${ci.tire.size} del carrito`}
+                    className="w-11 h-11 rounded flex items-center justify-center active:opacity-70"
+                    style={{ color: 'var(--br-red)' }}
+                  >
+                    <Trash2 className="h-5 w-5" />
                   </button>
                 </div>
               </div>
@@ -1012,6 +1062,23 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         message={`Se descartará "${parkedToDelete?.parkedName ?? parkedToDelete?.receiptNumber ?? ''}". Esta acción no se puede deshacer.`}
         type="danger"
         confirmText="Eliminar"
+      />
+
+      <ConfirmDialog
+        open={clearCartConfirm}
+        onClose={() => setClearCartConfirm(false)}
+        onConfirm={() => {
+          setCart([]);
+          setTicketDiscountId('');
+          setPendingDiscountValue('');
+          setPointsToRedeem('');
+          setClearCartConfirm(false);
+          if (resumingParkedId) setResumingParkedId(null);
+        }}
+        title="Vaciar carrito"
+        message={`Se quitarán ${cart.length} ${cart.length === 1 ? 'ítem' : 'ítems'} del carrito. No afecta el ticket abierto si lo había.`}
+        type="danger"
+        confirmText="Vaciar"
       />
     </div>
   );
