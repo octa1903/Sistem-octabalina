@@ -1,16 +1,21 @@
 import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { Order, OrderStatus } from '@/types';
 import { orderService } from '@/services/orderService';
+import { useRealtimeOrders } from '@/hooks/useRealtimeOrders';
 import { STATUS_COLORS, STATUS_LABELS, STATUS_FLOW } from '@/constants';
 import { Modal } from '@/components/ui/Modal';
+import { Input, Select, EmptyState } from '@/components/ui';
 import { formatCurrency } from '@/utils/currency';
-import { Search, ChevronRight, Package, Truck, User } from 'lucide-react';
+import { Search, ChevronRight, Package, Truck, User, Radio } from 'lucide-react';
 
-interface Props { addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void; }
+interface Props {
+  addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
+  storeId: string | null;
+}
 
 const ALL_STATUSES: OrderStatus[] = ['pendiente', 'confirmado', 'en_preparacion', 'listo', 'entregado', 'cancelado'];
 
-export function OrdersView({ addToast }: Props) {
+export function OrdersView({ addToast, storeId }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -43,6 +48,25 @@ export function OrdersView({ addToast }: Props) {
     return () => { active = false; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Realtime: el portal cliente o cualquier otro TPV de la misma tienda
+  // pueden insertar/actualizar pedidos. Mergeamos por id.
+  useRealtimeOrders(storeId, useCallback((evt) => {
+    setOrders((prev) => {
+      if (evt.kind === 'delete') return prev.filter((o) => o.id !== evt.id);
+      const next = evt.order;
+      const idx = prev.findIndex((o) => o.id === next.id);
+      if (idx === -1) {
+        if (evt.kind === 'insert') {
+          addToast(`Nuevo pedido #${next.numero} de ${next.clientName}.`, 'info');
+        }
+        return [next, ...prev];
+      }
+      const merged = [...prev];
+      merged[idx] = next;
+      return merged;
+    });
+  }, [addToast]));
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -88,36 +112,48 @@ export function OrdersView({ addToast }: Props) {
       <div className="flex items-center justify-between mb-5">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Pedidos</h1>
-          <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
+          <p className="text-sm flex items-center gap-2" style={{ color: 'var(--br-txt2)' }}>
             {loading ? 'Cargando…' : `${activeCount} activos · ${orders.length} total`}
+            {storeId && (
+              <span className="inline-flex items-center gap-1 text-xs" title="Recibiendo pedidos en vivo">
+                <Radio className="h-3 w-3 animate-pulse" style={{ color: 'var(--br-amb)' }} />
+                <span style={{ color: 'var(--br-amb)' }}>en vivo</span>
+              </span>
+            )}
           </p>
         </div>
       </div>
 
       <div className="flex gap-2 mb-4 flex-wrap">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--br-txt2)' }} />
-          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+        <div className="flex-1 min-w-48">
+          <Input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por número o cliente..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
-            style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }} />
+            iconLeft={<Search className="h-4 w-4" />}
+          />
         </div>
-        <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value as OrderStatus | '')}
-          className="px-3 py-2 rounded-lg text-sm outline-none"
-          style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
+        <Select
+          value={filterStatus}
+          onChange={(e) => setFilterStatus(e.target.value as OrderStatus | '')}
+          className="w-auto"
+        >
           <option value="">Todos los estados</option>
           {ALL_STATUSES.map((s) => <option key={s} value={s}>{STATUS_LABELS[s]}</option>)}
-        </select>
+        </Select>
       </div>
 
       <div className="space-y-2">
         {loading ? (
           <p className="text-sm text-center py-12" style={{ color: 'var(--br-txt2)' }}>Cargando pedidos…</p>
         ) : filtered.length === 0 ? (
-          <div className="rounded-xl py-12 text-center" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-            <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
-              {orders.length === 0 ? 'No hay pedidos registrados.' : 'Sin resultados.'}
-            </p>
+          <div className="rounded-xl" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
+            <EmptyState
+              icon={Package}
+              title={orders.length === 0 ? 'Sin pedidos hoy' : 'Sin resultados'}
+              description={orders.length === 0 ? 'Cuando llegue un pedido aparece acá.' : 'Probá ajustar los filtros.'}
+            />
           </div>
         ) : (
           filtered.map((o) => (
@@ -201,10 +237,12 @@ export function OrdersView({ addToast }: Props) {
               <div>
                 <p className="text-sm font-semibold mb-2" style={{ color: 'var(--br-txt)' }}>Avanzar estado</p>
                 <div className="space-y-2">
-                  <input type="text" value={internalNote} onChange={(e) => setInternalNote(e.target.value)}
+                  <Input
+                    type="text"
+                    value={internalNote}
+                    onChange={(e) => setInternalNote(e.target.value)}
                     placeholder="Nota interna (opcional)..."
-                    className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                    style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
+                  />
                   <div className="flex gap-2 flex-wrap">
                     {STATUS_FLOW[selected.status].map((next) => (
                       <button key={next} onClick={() => advanceStatus(selected, next as OrderStatus)}
