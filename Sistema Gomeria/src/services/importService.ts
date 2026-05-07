@@ -6,7 +6,7 @@
 import * as XLSX from 'xlsx';
 import { supabase } from './supabaseClient';
 import { ensureNoError } from './supabaseHelpers';
-import { sha256 } from '@/utils/hash';
+import { hashPin } from '@/utils/hash';
 import type { Category } from '@/types';
 
 export type RawRow = Record<string, unknown>;
@@ -270,7 +270,7 @@ export async function bulkInsertCustomers(parsed: CustomerImportRow[]): Promise<
   for (let i = 0; i < parsed.length; i++) {
     const r = parsed[i];
     try {
-      const pinHash = r.pin ? await sha256(r.pin) : null;
+      const pinHash = r.pin ? await hashPin(r.pin) : null;
       const { error } = await supabase.from('customers').insert({
         name: r.name,
         phone: r.phone ?? null,

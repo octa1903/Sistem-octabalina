@@ -3,7 +3,7 @@ import type { Client } from '@/types';
 import { customerServiceV2 } from '@/services/customerServiceV2';
 import { DEFAULT_PIN_HASH } from '@/constants';
 import { formatCurrency } from '@/utils/currency';
-import { sha256 } from '@/utils/hash';
+import { hashPin } from '@/utils/hash';
 import { Modal } from '@/components/ui/Modal';
 import { ImportModal } from '@/components/employee/import/ImportModal';
 import { Plus, Search, Edit2, Trash2, User, Phone, MapPin, Upload } from 'lucide-react';
@@ -80,7 +80,7 @@ export function ClientsView({ addToast }: Props) {
     setSaving(true);
     try {
       if (editing) {
-        pinHash = form.pin ? await sha256(form.pin) : editing.pinHash;
+        pinHash = form.pin ? await hashPin(form.pin) : editing.pinHash;
         await customerServiceV2.save({
           id: editing.id,
           name: form.name,
@@ -93,7 +93,7 @@ export function ClientsView({ addToast }: Props) {
           pinHash,
         });
       } else {
-        pinHash = form.pin ? await sha256(form.pin) : DEFAULT_PIN_HASH;
+        pinHash = form.pin ? await hashPin(form.pin) : DEFAULT_PIN_HASH;
         await customerServiceV2.save({
           name: form.name,
           phone: form.phone || undefined,

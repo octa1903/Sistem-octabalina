@@ -7,7 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import type { SessionType } from '@/types';
-import { storageGet, storageSet } from '@/utils/storage';
+import { sessionGet, sessionSet } from '@/utils/storage';
 import {
   EMPLOYEE_TIMEOUT,
   MAX_LOGIN_ATTEMPTS,
@@ -74,11 +74,13 @@ export function useAuth() {
           if (mounted) await supabase.auth.signOut();
         }
 
-        const saved = storageGet<AuthState | null>('auth_session', null);
+        // El token de cliente vive en sessionStorage: muere con la pestaña
+        // para reducir blast-radius de XSS y cookies persistentes.
+        const saved = sessionGet<AuthState | null>('auth_session', null);
         if (saved && saved.sessionType === 'client' && saved.expiresAt > Date.now()) {
           if (mounted) setAuth(saved);
         } else {
-          storageSet('auth_session', null);
+          sessionSet('auth_session', null);
         }
       } catch (e) {
         // eslint-disable-next-line no-console
@@ -90,7 +92,7 @@ export function useAuth() {
       if (!mounted) return;
       if (event === 'SIGNED_OUT') {
         setAuth(INITIAL);
-        storageSet('auth_session', null);
+        sessionSet('auth_session', null);
       }
     });
 
@@ -103,7 +105,7 @@ export function useAuth() {
   // Persistencia: sólo sesiones de cliente. Las de empleado las maneja Supabase.
   useEffect(() => {
     if (auth.isAuthenticated && auth.sessionType === 'client') {
-      storageSet('auth_session', auth);
+      sessionSet('auth_session', auth);
     }
   }, [auth]);
 
@@ -133,7 +135,7 @@ export function useAuth() {
       }
     }
     setAuth(INITIAL);
-    storageSet('auth_session', null);
+    sessionSet('auth_session', null);
     setError(null);
   }, [auth.sessionType, auth.clientToken]);
 

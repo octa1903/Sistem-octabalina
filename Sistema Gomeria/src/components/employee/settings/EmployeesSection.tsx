@@ -9,7 +9,7 @@ import type { Employee, Role, Store } from '@/types';
 import { employeeService } from '@/services/employeeService';
 import { roleService } from '@/services/roleService';
 import { storeService } from '@/services/storeService';
-import { sha256 } from '@/utils/hash';
+import { hashPin } from '@/utils/hash';
 import { Modal } from '@/components/ui/Modal';
 import { UserPlus, Edit2, Users, Power, KeyRound } from 'lucide-react';
 
@@ -142,7 +142,7 @@ export function EmployeesSection({ addToast }: Props) {
       // wantsPinChange === false implica editing !== null (es la única rama
       // donde se permite no enviar PIN), por eso este fallback es seguro.
       const existingHash = editing?.pinHash ?? '';
-      const pinHash = wantsPinChange ? await sha256(form.pin) : existingHash;
+      const pinHash = wantsPinChange ? await hashPin(form.pin) : existingHash;
       await employeeService.save({
         id: editing?.id,
         name: form.name.trim(),
