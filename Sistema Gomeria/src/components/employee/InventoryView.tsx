@@ -6,7 +6,8 @@ import { taxService } from '@/services/taxService';
 import { formatCurrency, calculateSalePrice } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
 import { ImportModal } from '@/components/employee/import/ImportModal';
-import { Plus, Search, Edit2, Trash2, AlertTriangle, Upload } from 'lucide-react';
+import { Button, IconButton, FormField, Input, Select, EmptyState } from '@/components/ui';
+import { Plus, Search, Edit2, Trash2, AlertTriangle, Upload, TrendingUp, Package } from 'lucide-react';
 
 interface Props {
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
@@ -52,6 +53,17 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<Tire | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkForm, setBulkForm] = useState({
+    pctDelta: 5,
+    brand: '' as string,
+    categoryId: '' as string,
+    touchCost: false,
+    touchDefaultPrice: true,
+    touchOverrides: false,
+  });
+  const [bulkPreview, setBulkPreview] = useState<{ tiresCount: number; overridesCount: number } | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!activeStoreId) return;
@@ -231,56 +243,61 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
           </p>
         </div>
         <div className="flex gap-2">
-          <button
+          <Button
+            variant="secondary"
             onClick={() => setImportOpen(true)}
             disabled={loading || categories.length === 0}
-            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold disabled:opacity-50"
-            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}
+            iconLeft={<Upload className="h-4 w-4" />}
           >
-            <Upload className="h-4 w-4" /> Importar
-          </button>
-          <button
+            Importar
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => { setBulkPreview(null); setBulkOpen(true); }}
+            disabled={loading || tires.length === 0}
+            iconLeft={<TrendingUp className="h-4 w-4" />}
+            title="Ajuste masivo de precios o costos"
+          >
+            Ajuste masivo
+          </Button>
+          <Button
+            variant="primary"
             onClick={openNew}
             disabled={loading || categories.length === 0}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white text-sm font-semibold disabled:opacity-50"
-            style={{ background: 'var(--br-amb)' }}
+            iconLeft={<Plus className="h-4 w-4" />}
           >
-            <Plus className="h-4 w-4" /> Nuevo neumático
-          </button>
+            Nuevo neumático
+          </Button>
         </div>
       </div>
 
       {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-4">
-        <div className="relative flex-1 min-w-48">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--br-txt2)' }} />
-          <input
+        <div className="flex-1 min-w-48">
+          <Input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar marca, modelo, medida..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
-            style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }}
+            iconLeft={<Search className="h-4 w-4" />}
           />
         </div>
-        <select
+        <Select
           value={filterBrand}
           onChange={(e) => setFilterBrand(e.target.value)}
-          className="px-3 py-2 rounded-lg text-sm outline-none"
-          style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+          className="w-auto"
         >
           <option value="">Todas las marcas</option>
           {brands.map((b) => <option key={b}>{b}</option>)}
-        </select>
-        <select
+        </Select>
+        <Select
           value={filterCat}
           onChange={(e) => setFilterCat(e.target.value)}
-          className="px-3 py-2 rounded-lg text-sm outline-none"
-          style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+          className="w-auto"
         >
           <option value="">Todas las categorías</option>
           {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-        </select>
+        </Select>
         <button
           onClick={() => setOnlyLow(!onlyLow)}
           className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -309,8 +326,13 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
               {loading ? (
                 <tr><td colSpan={9} className="px-4 py-12 text-center text-sm" style={{ color: 'var(--br-txt2)' }}>Cargando...</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-sm" style={{ color: 'var(--br-txt2)' }}>
-                  {tires.length === 0 ? 'No hay neumáticos en esta tienda.' : 'Sin resultados.'}
+                <tr><td colSpan={9}>
+                  <EmptyState
+                    icon={Package}
+                    title={tires.length === 0 ? 'Sin neumáticos' : 'Sin resultados'}
+                    description={tires.length === 0 ? 'Creá el primer neumático con el botón "Nuevo neumático".' : 'Probá ajustar los filtros de búsqueda.'}
+                    density="compact"
+                  />
                 </td></tr>
               ) : (
                 filtered.map((t) => {
@@ -337,12 +359,22 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex gap-1 justify-end">
-                          <button onClick={() => openEdit(t)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }} title="Editar">
-                            <Edit2 className="h-4 w-4" />
-                          </button>
-                          <button onClick={() => setDeleting(t)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }} title="Eliminar">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <IconButton
+                            label="Editar neumático"
+                            icon={<Edit2 className="h-4 w-4" />}
+                            tone="neutral"
+                            size="sm"
+                            bordered={false}
+                            onClick={() => openEdit(t)}
+                          />
+                          <IconButton
+                            label="Eliminar neumático"
+                            icon={<Trash2 className="h-4 w-4" />}
+                            tone="danger"
+                            size="sm"
+                            bordered={false}
+                            onClick={() => setDeleting(t)}
+                          />
                         </div>
                       </td>
                     </tr>
@@ -363,44 +395,42 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
           <section>
             <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--br-txt2)' }}>Neumático</p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Marca *">
-                <Inp value={form.brand} onChange={v => setFormField('brand', v)} />
-              </Field>
-              <Field label="Modelo *">
-                <Inp value={form.model} onChange={v => setFormField('model', v)} />
-              </Field>
+              <FormField label="Marca" required>
+                <Input value={form.brand} onChange={e => setFormField('brand', e.target.value)} />
+              </FormField>
+              <FormField label="Modelo" required>
+                <Input value={form.model} onChange={e => setFormField('model', e.target.value)} />
+              </FormField>
               <div className="col-span-2">
-                <Field label="Medida *">
-                  <Inp value={form.size} onChange={v => setFormField('size', v)} placeholder="Ej: 185/65 R15 88H" />
-                </Field>
+                <FormField label="Medida" required>
+                  <Input value={form.size} onChange={e => setFormField('size', e.target.value)} placeholder="Ej: 185/65 R15 88H" />
+                </FormField>
               </div>
-              <Field label="Categoría *">
-                <select
+              <FormField label="Categoría" required>
+                <Select
                   value={form.categoryId}
                   onChange={(e) => setFormField('categoryId', e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
                 >
                   {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </Field>
-              <Field label="SKU (opcional)">
-                <Inp value={form.sku} onChange={v => setFormField('sku', v)} placeholder="Ej: PIR-175-13" />
-              </Field>
-              <Field label="Costo ($)">
-                <NumInp value={form.cost} onChange={v => setFormField('cost', v)} />
-              </Field>
-              <Field label="Margen (%)">
-                <NumInp value={form.margin} onChange={v => setFormField('margin', v)} max={200} />
-              </Field>
+                </Select>
+              </FormField>
+              <FormField label="SKU" badge="opcional">
+                <Input value={form.sku} onChange={e => setFormField('sku', e.target.value)} placeholder="Ej: PIR-175-13" />
+              </FormField>
+              <FormField label="Costo ($)">
+                <Input type="number" value={form.cost} onChange={e => setFormField('cost', Number(e.target.value))} min={0} />
+              </FormField>
+              <FormField label="Margen (%)">
+                <Input type="number" value={form.margin} onChange={e => setFormField('margin', Number(e.target.value))} min={0} max={200} />
+              </FormField>
               <div className="col-span-2">
-                <Field label="Notas">
-                  <Inp value={form.notes} onChange={v => setFormField('notes', v)} />
-                </Field>
+                <FormField label="Notas">
+                  <Input value={form.notes} onChange={e => setFormField('notes', e.target.value)} />
+                </FormField>
               </div>
               {taxes.length > 0 && (
                 <div className="col-span-2">
-                  <Field label="Impuestos aplicados">
+                  <FormField label="Impuestos aplicados">
                     <div className="space-y-1.5 mt-1">
                       {taxes.map(tax => (
                         <label key={tax.id} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--br-txt)' }}>
@@ -420,7 +450,7 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
                         </label>
                       ))}
                     </div>
-                  </Field>
+                  </FormField>
                 </div>
               )}
             </div>
@@ -429,35 +459,34 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
           <section>
             <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--br-txt2)' }}>En esta tienda</p>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Precio de venta ($)">
-                <input
+              <FormField label="Precio de venta ($)">
+                <Input
                   type="number"
                   value={form.price}
                   onChange={(e) => setFormField('price', Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-                  style={{ border: '1px solid var(--br-amb)', background: 'var(--br-amb-bg)', color: 'var(--br-txt)' }}
                   min={0}
+                  style={{ border: '1px solid var(--br-amb)', background: 'var(--br-amb-bg)' }}
                 />
-              </Field>
-              <Field label="Ubicación">
-                <Inp value={form.location} onChange={v => setFormField('location', v)} placeholder="Ej: A1" />
-              </Field>
-              <Field label="Stock">
-                <NumInp value={form.stock} onChange={v => setFormField('stock', v)} />
-              </Field>
-              <Field label="Mínimo (alerta stock bajo)">
-                <NumInp value={form.lowStockThreshold} onChange={v => setFormField('lowStockThreshold', v)} />
-              </Field>
+              </FormField>
+              <FormField label="Ubicación">
+                <Input value={form.location} onChange={e => setFormField('location', e.target.value)} placeholder="Ej: A1" />
+              </FormField>
+              <FormField label="Stock">
+                <Input type="number" value={form.stock} onChange={e => setFormField('stock', Number(e.target.value))} min={0} />
+              </FormField>
+              <FormField label="Mínimo (alerta stock bajo)">
+                <Input type="number" value={form.lowStockThreshold} onChange={e => setFormField('lowStockThreshold', Number(e.target.value))} min={0} />
+              </FormField>
             </div>
           </section>
 
           <div className="flex justify-end gap-2">
-            <button onClick={() => setModalOpen(false)} disabled={submitting} className="px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-50" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>
+            <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={submitting}>
               Cancelar
-            </button>
-            <button onClick={save} disabled={submitting} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
-              {submitting ? 'Guardando...' : 'Guardar'}
-            </button>
+            </Button>
+            <Button variant="primary" onClick={save} loading={submitting}>
+              Guardar
+            </Button>
           </div>
         </div>
       </Modal>
@@ -475,6 +504,160 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
         }}
       />
 
+      {/* Bulk price adjust modal */}
+      <Modal open={bulkOpen} onClose={() => setBulkOpen(false)} title="Ajuste masivo de precios" size="md">
+        <div className="space-y-4">
+          <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
+            Aplicá un porcentaje (positivo o negativo) a costo, precio base o precios por tienda.
+            Filtrá por marca y/o categoría para limitar el alcance.
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <FormField label="Marca">
+              <Select
+                value={bulkForm.brand}
+                onChange={(e) => { setBulkForm(f => ({ ...f, brand: e.target.value })); setBulkPreview(null); }}
+              >
+                <option value="">Todas las marcas</option>
+                {brands.map(b => <option key={b} value={b}>{b}</option>)}
+              </Select>
+            </FormField>
+            <FormField label="Categoría">
+              <Select
+                value={bulkForm.categoryId}
+                onChange={(e) => { setBulkForm(f => ({ ...f, categoryId: e.target.value })); setBulkPreview(null); }}
+              >
+                <option value="">Todas las categorías</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
+            </FormField>
+            <div className="col-span-2">
+              <FormField label="Porcentaje (%) — usá negativo para bajar">
+                <Input
+                  type="number"
+                  value={bulkForm.pctDelta}
+                  onChange={(e) => { setBulkForm(f => ({ ...f, pctDelta: Number(e.target.value) })); setBulkPreview(null); }}
+                  step={0.5}
+                />
+              </FormField>
+            </div>
+          </div>
+
+          <div className="rounded-lg p-3 space-y-2" style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)' }}>
+            <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--br-txt2)' }}>¿Qué tocar?</p>
+            <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--br-txt)' }}>
+              <input
+                type="checkbox"
+                checked={bulkForm.touchCost}
+                onChange={(e) => { setBulkForm(f => ({ ...f, touchCost: e.target.checked })); setBulkPreview(null); }}
+              />
+              Costo (por proveedor)
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--br-txt)' }}>
+              <input
+                type="checkbox"
+                checked={bulkForm.touchDefaultPrice}
+                onChange={(e) => { setBulkForm(f => ({ ...f, touchDefaultPrice: e.target.checked })); setBulkPreview(null); }}
+              />
+              Precio de venta base (todas las tiendas)
+            </label>
+            <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--br-txt)' }}>
+              <input
+                type="checkbox"
+                checked={bulkForm.touchOverrides}
+                onChange={(e) => { setBulkForm(f => ({ ...f, touchOverrides: e.target.checked })); setBulkPreview(null); }}
+              />
+              Precios especiales de esta tienda
+            </label>
+          </div>
+
+          {bulkPreview && (
+            <div className="rounded-lg p-3 text-sm" style={{ background: 'var(--br-amb-bg)', border: '1px solid var(--br-amb-bor)', color: 'var(--br-txt)' }}>
+              Vas a {bulkForm.pctDelta >= 0 ? 'aumentar' : 'reducir'} <strong>{Math.abs(bulkForm.pctDelta)}%</strong>
+              {(bulkForm.touchCost || bulkForm.touchDefaultPrice) && (
+                <> · <strong>{bulkPreview.tiresCount}</strong> producto(s)</>
+              )}
+              {bulkForm.touchOverrides && (
+                <> · <strong>{bulkPreview.overridesCount}</strong> precio(s) por tienda</>
+              )}
+              {bulkPreview.tiresCount === 0 && bulkPreview.overridesCount === 0 && (
+                <span style={{ color: 'var(--br-red)' }}> — ningún producto coincide con los filtros.</span>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="secondary"
+              onClick={() => setBulkOpen(false)}
+              disabled={bulkBusy}
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="secondary"
+              loading={bulkBusy}
+              onClick={async () => {
+                setBulkBusy(true);
+                try {
+                  const r = await tireServiceV2.bulkAdjustPrices({
+                    pctDelta: bulkForm.pctDelta,
+                    brand: bulkForm.brand || null,
+                    categoryId: bulkForm.categoryId || null,
+                    storeId: activeStoreId,
+                    touchCost: bulkForm.touchCost,
+                    touchDefaultPrice: bulkForm.touchDefaultPrice,
+                    touchOverrides: bulkForm.touchOverrides,
+                    dryRun: true,
+                  });
+                  setBulkPreview({ tiresCount: r.tiresCount, overridesCount: r.overridesCount });
+                } catch (e) {
+                  addToast(e instanceof Error ? e.message : 'Error calculando preview.', 'error');
+                } finally {
+                  setBulkBusy(false);
+                }
+              }}
+            >
+              Calcular impacto
+            </Button>
+            <Button
+              variant="primary"
+              loading={bulkBusy}
+              disabled={bulkBusy || !bulkPreview}
+              onClick={async () => {
+                if (!bulkPreview || (bulkPreview.tiresCount === 0 && bulkPreview.overridesCount === 0)) {
+                  addToast('Calculá el impacto primero.', 'warning');
+                  return;
+                }
+                if (!confirm(`Confirmá: ${bulkForm.pctDelta >= 0 ? '+' : ''}${bulkForm.pctDelta}% sobre los productos seleccionados.`)) return;
+                setBulkBusy(true);
+                try {
+                  const r = await tireServiceV2.bulkAdjustPrices({
+                    pctDelta: bulkForm.pctDelta,
+                    brand: bulkForm.brand || null,
+                    categoryId: bulkForm.categoryId || null,
+                    storeId: activeStoreId,
+                    touchCost: bulkForm.touchCost,
+                    touchDefaultPrice: bulkForm.touchDefaultPrice,
+                    touchOverrides: bulkForm.touchOverrides,
+                    dryRun: false,
+                  });
+                  addToast(`Ajustados ${r.tiresCount} producto(s) y ${r.overridesCount} precio(s) por tienda.`, 'success');
+                  setBulkOpen(false);
+                  await refresh();
+                } catch (e) {
+                  addToast(e instanceof Error ? e.message : 'Error aplicando ajuste.', 'error');
+                } finally {
+                  setBulkBusy(false);
+                }
+              }}
+            >
+              Aplicar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
       {/* Delete confirm */}
       <Modal open={!!deleting} onClose={() => setDeleting(null)} title="Confirmar eliminación" size="sm">
         <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
@@ -482,56 +665,15 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
           Esta acción no se puede deshacer.
         </p>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setDeleting(null)} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>
+          <Button variant="secondary" onClick={() => setDeleting(null)}>
             Cancelar
-          </button>
-          <button onClick={confirmDelete} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-red)' }}>
+          </Button>
+          <Button variant="danger" onClick={confirmDelete}>
             Eliminar
-          </button>
+          </Button>
         </div>
       </Modal>
     </div>
   );
 }
 
-// ── Inputs reutilizables ────────────────────────────
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function Inp({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
-  return (
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-      style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-      onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-      onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')}
-    />
-  );
-}
-
-function NumInp({ value, onChange, max }: { value: number; onChange: (v: number) => void; max?: number }) {
-  return (
-    <input
-      type="number"
-      value={value}
-      onChange={(e) => onChange(Number(e.target.value))}
-      min={0}
-      max={max}
-      className="w-full px-3 py-2 rounded-lg text-sm outline-none"
-      style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-      onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-      onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')}
-    />
-  );
-}

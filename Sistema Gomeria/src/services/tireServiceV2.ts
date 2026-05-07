@@ -113,6 +113,46 @@ export const tireServiceV2 = {
     return all.filter(o => o.stock <= o.lowStockThreshold);
   },
 
+  // ── Ajuste masivo de precios (RPC bulk_adjust_tire_prices) ────────
+
+  /**
+   * Ajusta cost / default_price / overrides en bloque.
+   * `pctDelta`: porcentaje (positivo o negativo). Cap ±100% en server.
+   * Filtros opcionales: `brand`, `categoryId`. `storeId` requerido si
+   * `touchOverrides=true`.
+   * `dryRun=true` → no escribe, devuelve sólo el conteo (preview).
+   */
+  async bulkAdjustPrices(args: {
+    pctDelta: number;
+    brand?: string | null;
+    categoryId?: string | null;
+    storeId?: string | null;
+    touchCost?: boolean;
+    touchDefaultPrice?: boolean;
+    touchOverrides?: boolean;
+    dryRun?: boolean;
+  }): Promise<{ dryRun: boolean; factor: number; tiresCount: number; overridesCount: number }> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.rpc as any)('bulk_adjust_tire_prices', {
+      p_pct_delta: args.pctDelta,
+      p_brand: args.brand ?? null,
+      p_category_id: args.categoryId ?? null,
+      p_store_id: args.storeId ?? null,
+      p_touch_cost: !!args.touchCost,
+      p_touch_default_price: !!args.touchDefaultPrice,
+      p_touch_overrides: !!args.touchOverrides,
+      p_dry_run: args.dryRun ?? true,
+    });
+    if (error) throw error;
+    const r = data as { dry_run: boolean; factor: number; tires_count: number; overrides_count: number };
+    return {
+      dryRun: r.dry_run,
+      factor: Number(r.factor),
+      tiresCount: r.tires_count,
+      overridesCount: r.overrides_count,
+    };
+  },
+
   // ── Mapeo v2 → v1 ──────────────────────────────────
 
   /**
