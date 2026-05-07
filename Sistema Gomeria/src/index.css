@@ -17,6 +17,9 @@
   --br-grn-bg: #e8f5ee;
   --br-grn-bor: #90d4a8;
   --br-dark: #1a1814;
+  --br-dark-bor: #2a2520;     /* divisores dentro del sidebar oscuro */
+  --br-dark-txt2: #9a9590;    /* texto muted sobre fondo oscuro */
+  --br-dark-amb-bg: rgba(196, 123, 18, 0.12); /* nav item activo */
   --br-info: #2563eb;
   --br-info-bg: #e6efff;
   --br-info-bor: #a8c4f5;

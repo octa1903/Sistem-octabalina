@@ -99,10 +99,10 @@ export function EmployeeApp({ auth }: Props) {
       <aside
         aria-label="Navegación principal"
         className="flex flex-col w-16 lg:w-56 flex-shrink-0 h-full"
-        style={{ background: 'var(--br-dark)', borderRight: '1px solid #2a2520' }}
+        style={{ background: 'var(--br-dark)', borderRight: '1px solid var(--br-dark-bor)' }}
       >
         {/* Logo */}
-        <div className="px-3 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid #2a2520' }}>
+        <div className="px-3 py-4 flex items-center gap-3" style={{ borderBottom: '1px solid var(--br-dark-bor)' }}>
           <div
             className="w-9 h-9 flex items-center justify-center rounded-lg text-white font-bold text-lg flex-shrink-0"
             style={{ background: 'var(--br-amb)' }}
@@ -111,7 +111,7 @@ export function EmployeeApp({ auth }: Props) {
           </div>
           <div className="hidden lg:block overflow-hidden">
             <p className="text-sm font-semibold text-white truncate leading-tight">Baliña Ruedas</p>
-            <p className="text-xs truncate" style={{ color: '#9a9590' }}>
+            <p className="text-xs truncate" style={{ color: 'var(--br-dark-txt2)' }}>
               {current.employee
                 ? `${current.employee.name}${current.employee.role ? ` · ${current.employee.role.name}` : ''}`
                 : auth.employeeName ?? 'Empleado'}
@@ -132,8 +132,8 @@ export function EmployeeApp({ auth }: Props) {
                 title={label}
                 className="w-full flex items-center gap-3 px-3 py-2.5 transition-colors text-left"
                 style={{
-                  color: active ? 'var(--br-amb)' : '#9a9590',
-                  background: active ? 'rgba(196,123,18,0.12)' : 'transparent',
+                  color: active ? 'var(--br-amb)' : 'var(--br-dark-txt2)',
+                  background: active ? 'var(--br-dark-amb-bg)' : 'transparent',
                   borderLeft: active ? '3px solid var(--br-amb)' : '3px solid transparent',
                 }}
               >
@@ -145,14 +145,14 @@ export function EmployeeApp({ auth }: Props) {
         </nav>
 
         {/* Switch operator + Logout */}
-        <div className="p-3 space-y-1" style={{ borderTop: '1px solid #2a2520' }}>
+        <div className="p-3 space-y-1" style={{ borderTop: '1px solid var(--br-dark-bor)' }}>
           {current.employee && (
             <button
               onClick={current.logout}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors"
-              style={{ color: '#9a9590' }}
+              style={{ color: 'var(--br-dark-txt2)' }}
               onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
-              onMouseOut={(e) => (e.currentTarget.style.color = '#9a9590')}
+              onMouseOut={(e) => (e.currentTarget.style.color = 'var(--br-dark-txt2)')}
               title="Cambiar operador (no cierra sesión web)"
             >
               <UserCog className="h-5 w-5 flex-shrink-0" />
@@ -162,9 +162,9 @@ export function EmployeeApp({ auth }: Props) {
           <button
             onClick={() => { current.logout(); auth.logout(); }}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors"
-            style={{ color: '#9a9590' }}
+            style={{ color: 'var(--br-dark-txt2)' }}
             onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
-            onMouseOut={(e) => (e.currentTarget.style.color = '#9a9590')}
+            onMouseOut={(e) => (e.currentTarget.style.color = 'var(--br-dark-txt2)')}
           >
             <LogOut className="h-5 w-5 flex-shrink-0" />
             <span className="hidden lg:block text-sm">Salir</span>

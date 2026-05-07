@@ -1,6 +1,7 @@
 import type { Store, CashSession } from '@/types';
 import { Store as StoreIcon, LockOpen, Lock } from 'lucide-react';
 import { formatCurrency } from '@/utils/currency';
+import { Button } from '@/components/ui';
 
 interface Props {
   stores: Store[];
@@ -67,42 +68,30 @@ export function TopBar({
           <>
             <span
               className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold"
-              style={{ background: 'rgba(21,128,61,0.10)', color: '#15803d', border: '1px solid rgba(21,128,61,0.30)' }}
+              style={{ background: 'var(--br-grn-bg)', color: 'var(--br-grn)', border: '1px solid var(--br-grn-bor)' }}
             >
               <LockOpen className="h-3 w-3" />
               Caja abierta · {formatCurrency(session.openingFloat)}
             </span>
             {canCloseCash && (
-              <button
-                type="button"
-                onClick={onCloseCash}
-                disabled={!activeStoreId}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
-                style={{ background: 'var(--br-red)' }}
-              >
+              <Button variant="danger" size="sm" onClick={onCloseCash} disabled={!activeStoreId}>
                 Cerrar caja
-              </button>
+              </Button>
             )}
           </>
         ) : (
           <>
             <span
               className="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full font-semibold"
-              style={{ background: 'rgba(220,38,38,0.08)', color: 'var(--br-red)', border: '1px solid rgba(220,38,38,0.30)' }}
+              style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}
             >
               <Lock className="h-3 w-3" />
               Caja cerrada
             </span>
             {canOpenCash && (
-              <button
-                type="button"
-                onClick={onOpenCash}
-                disabled={!activeStoreId}
-                className="text-xs font-semibold px-3 py-1.5 rounded-lg text-white disabled:opacity-50"
-                style={{ background: '#15803d' }}
-              >
+              <Button variant="success" size="sm" onClick={onOpenCash} disabled={!activeStoreId}>
                 Abrir caja
-              </button>
+              </Button>
             )}
           </>
         )}

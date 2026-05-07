@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Discount } from '@/types';
 import { discountService } from '@/services/discountService';
 import { Modal } from '@/components/ui/Modal';
+import { Button } from '@/components/ui';
 import { Plus, Edit2, Trash2, Tag } from 'lucide-react';
 
 interface Props {
@@ -205,10 +206,8 @@ export function DiscountsSection({ addToast }: Props) {
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setModalOpen(false)} disabled={submitting} className="px-4 py-2 rounded-lg text-sm disabled:opacity-50" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={save} disabled={submitting} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50" style={{ background: 'var(--br-amb)' }}>
-            {submitting ? 'Guardando...' : 'Guardar'}
-          </button>
+          <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={submitting}>Cancelar</Button>
+          <Button variant="primary" onClick={save} loading={submitting}>Guardar</Button>
         </div>
       </Modal>
 
@@ -217,8 +216,8 @@ export function DiscountsSection({ addToast }: Props) {
           ¿Eliminar <strong>{deleting?.name}</strong>? No afecta recibos ya emitidos, sólo deja de aparecer en el POS.
         </p>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setDeleting(null)} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={confirmDelete} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-red)' }}>Eliminar</button>
+          <Button variant="secondary" onClick={() => setDeleting(null)}>Cancelar</Button>
+          <Button variant="danger" onClick={confirmDelete}>Eliminar</Button>
         </div>
       </Modal>
     </div>
