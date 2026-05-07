@@ -4,7 +4,7 @@ import { customerServiceV2 } from '@/services/customerServiceV2';
 import { supabase } from '@/services/supabaseClient';
 import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
-import { Modal, Input } from '@/components/ui';
+import { Modal, Input, Button } from '@/components/ui';
 import { Search, Plus, Minus, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface Props {
@@ -306,11 +306,14 @@ export function AccountsView({ addToast, employeeId }: Props) {
           </div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
-          <button onClick={() => setPaymentOpen(false)} disabled={submitting} className="px-4 py-2 rounded-lg text-sm disabled:opacity-50" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>Cancelar</button>
-          <button onClick={savePayment} disabled={submitting} className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-            style={{ background: paymentType === 'charge' ? 'var(--br-red)' : 'var(--br-grn)' }}>
-            {submitting ? 'Guardando...' : paymentType === 'charge' ? 'Registrar cargo' : 'Registrar pago'}
-          </button>
+          <Button variant="secondary" onClick={() => setPaymentOpen(false)} disabled={submitting}>Cancelar</Button>
+          <Button
+            variant={paymentType === 'charge' ? 'danger' : 'success'}
+            onClick={savePayment}
+            loading={submitting}
+          >
+            {paymentType === 'charge' ? 'Registrar cargo' : 'Registrar pago'}
+          </Button>
         </div>
       </Modal>
     </div>

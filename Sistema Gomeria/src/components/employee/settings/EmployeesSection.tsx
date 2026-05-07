@@ -241,7 +241,7 @@ export function EmployeesSection({ addToast }: Props) {
                   <button
                     onClick={() => toggleActive(emp)}
                     className="p-1.5 rounded"
-                    style={{ color: emp.active ? 'var(--br-red)' : 'var(--br-grn, #15803d)' }}
+                    style={{ color: emp.active ? 'var(--br-red)' : 'var(--br-grn)' }}
                     title={emp.active ? 'Desactivar' : 'Activar'}
                   >
                     <Power className="h-4 w-4" />
