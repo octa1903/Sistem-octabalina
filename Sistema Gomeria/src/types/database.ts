@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       app_features: {
@@ -1256,9 +1231,44 @@ export type Database = {
       }
     }
     Functions: {
+      _pbkdf2_sha256: {
+        Args: {
+          p_dklen: number
+          p_iter: number
+          p_password: string
+          p_salt: string
+        }
+        Returns: string
+      }
+      _pbkdf2_sha256_block: {
+        Args: {
+          p_block_index: number
+          p_iter: number
+          p_password: string
+          p_salt: string
+        }
+        Returns: string
+      }
+      _verify_customer_pin: {
+        Args: { p_hash: string; p_pin: string }
+        Returns: boolean
+      }
       apply_receipt_to_stock: {
         Args: { p_receipt_id: string }
         Returns: undefined
+      }
+      bulk_adjust_tire_prices: {
+        Args: {
+          p_brand?: string
+          p_category_id?: string
+          p_dry_run?: boolean
+          p_pct_delta: number
+          p_store_id?: string
+          p_touch_cost?: boolean
+          p_touch_default_price?: boolean
+          p_touch_overrides?: boolean
+        }
+        Returns: Json
       }
       close_cash_session: {
         Args: {
@@ -1276,6 +1286,28 @@ export type Database = {
       current_employee_id: { Args: never; Returns: string }
       current_employee_role: { Args: never; Returns: string }
       current_employee_store_ids: { Args: never; Returns: string[] }
+      customer_login: {
+        Args: { p_customer_id: string; p_pin: string }
+        Returns: {
+          customer_id: string
+          customer_name: string
+          expires_at: string
+          token: string
+        }[]
+      }
+      customer_self_movements: {
+        Args: { p_limit?: number; p_token: string }
+        Returns: {
+          amount: number
+          at: string
+          customer_id: string
+          id: string
+          notes: string
+          payment_method_id: string
+          receipt_id: string
+          type: string
+        }[]
+      }
       recompute_customer_metrics: {
         Args: { p_customer_id: string }
         Returns: undefined
@@ -1409,9 +1441,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
