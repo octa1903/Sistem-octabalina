@@ -11,6 +11,9 @@ import { DiscountsSection } from './settings/DiscountsSection';
 import { LoyaltySection } from './settings/LoyaltySection';
 import { ReceiptConfigSection } from './settings/ReceiptConfigSection';
 import { EmployeesSection } from './settings/EmployeesSection';
+import { RolesSection } from './settings/RolesSection';
+import { SalespeopleSection } from './settings/SalespeopleSection';
+import { InsuranceCompaniesSection } from './settings/InsuranceCompaniesSection';
 import { hasPermission } from '@/services/roleService';
 import type { Role } from '@/types';
 import { Key, Download, Upload, ToggleLeft, ToggleRight, Plus, X } from 'lucide-react';
@@ -175,6 +178,19 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
 
       {/* Empleados (solo con employees.manage) */}
       {canManageEmployees && <EmployeesSection addToast={addToast} />}
+
+      {/* Roles: tope de descuento por rol (solo con employees.manage) */}
+      {canManageEmployees && (
+        <Section title="Roles · Tope de descuento">
+          <RolesSection addToast={addToast} />
+        </Section>
+      )}
+
+      {/* Vendedores (Fase 1.5) */}
+      <SalespeopleSection addToast={addToast} storeId={activeStoreId ?? null} />
+
+      {/* Aseguradoras (Fase 1.5) */}
+      <InsuranceCompaniesSection addToast={addToast} />
 
       {/* Security */}
       <Section title="Seguridad">
