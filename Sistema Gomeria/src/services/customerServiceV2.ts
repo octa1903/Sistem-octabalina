@@ -6,12 +6,46 @@ const TABLE = 'customers';
 const MOVEMENTS = 'customer_account_movements';
 
 export const customerServiceV2 = {
+  /**
+   * Lista de clientes activos (excluye soft-deleted via migration 0023).
+   * Para incluir soft-deleted, usar getAllIncludingDeleted().
+   */
   async getAll(): Promise<Customer[]> {
     const { data, error } = await supabase
       .from(TABLE)
       .select('*')
+      .is('deleted_at', null)
       .order('name', { ascending: true });
     return ensureNoError(data, error, 'customerServiceV2.getAll').map(r => rowToCamel<Customer>(r));
+  },
+
+  /** Incluye también los soft-deleted (uso admin/reportes históricos). */
+  async getAllIncludingDeleted(): Promise<Customer[]> {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .order('name', { ascending: true });
+    return ensureNoError(data, error, 'customerServiceV2.getAllIncludingDeleted').map(r =>
+      rowToCamel<Customer>(r),
+    );
+  },
+
+  /** Soft delete: marca deleted_at sin borrar la fila. Migration 0023. */
+  async softDelete(id: string): Promise<void> {
+    const { error } = await supabase
+      .from(TABLE)
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', id);
+    if (error) throw error;
+  },
+
+  /** Restaurar un cliente soft-deleted. */
+  async restore(id: string): Promise<void> {
+    const { error } = await supabase
+      .from(TABLE)
+      .update({ deleted_at: null })
+      .eq('id', id);
+    if (error) throw error;
   },
 
   async getById(id: string): Promise<Customer | undefined> {
@@ -29,6 +63,7 @@ export const customerServiceV2 = {
       .from(TABLE)
       .select('*')
       .eq('customer_type', 'wholesale')
+      .is('deleted_at', null)
       .order('name', { ascending: true });
     return ensureNoError(data, error, 'customerServiceV2.getWholesale').map(r =>
       rowToCamel<Customer>(r),
@@ -79,6 +114,14 @@ export const customerServiceV2 = {
       .insert(payload)
       .select()
       .single();
+    if (error) {
+      // Migration 0019: trigger trg_credit_limit_check usa errcode 23514 +
+      // hint='credit_limit_exceeded' cuando un charge excede el cupo.
+      const hint = (error as { hint?: string }).hint;
+      if (error.code === '23514' && hint === 'credit_limit_exceeded') {
+        throw new Error('El cargo excede el cupo de crédito del cliente.');
+      }
+    }
     return rowToCamel<CustomerAccountMovement>(
       ensureNoError(data, error, 'customerServiceV2.addMovement'),
     );

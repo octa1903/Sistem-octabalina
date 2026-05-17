@@ -13,7 +13,7 @@ import { discountService } from '@/services/discountService';
 import { storeService } from '@/services/storeService';
 import { receiptConfigService } from '@/services/receiptConfigService';
 import { useCurrentEmployee } from '@/hooks/useCurrentEmployee';
-import { hasPermission } from '@/services/roleService';
+import { hasPermission, maxDiscountFor } from '@/services/roleService';
 import { supabase } from '@/services/supabaseClient';
 import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
@@ -49,6 +49,15 @@ interface CartItem {
 
 const DEFAULT_LOYALTY: LoyaltyConfig = { enabled: false, earnPercent: 0 };
 
+// Cuenta corriente: detectada por nombre normalizado del PaymentMethod, ya que
+// el enum `type` no distingue ('other'). Cobrar contra cuenta sin cliente
+// seleccionado deja deuda huérfana — bloqueamos el flujo.
+function isAccountPaymentMethod(pm: PaymentMethod | undefined): boolean {
+  if (!pm) return false;
+  const n = pm.name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return n.includes('cuenta corriente') || n.includes('cta cte') || n.includes('cta. cte');
+}
+
 // Lookup local: cuenta receipts existentes para el store y arma el próximo número
 async function nextReceiptNumber(storeId: string): Promise<string> {
   const { count, error } = await supabase
@@ -63,6 +72,9 @@ async function nextReceiptNumber(storeId: string): Promise<string> {
 export function POSView({ addToast, storeId, cashSession, employeeId, employeeName }: Props) {
   const current = useCurrentEmployee();
   const canDiscount = hasPermission(current.employee?.role ?? null, 'pos.discount');
+  // Tope de descuento del rol del operador (en %). 100 = sin tope.
+  // Coordinado con migration 0020: el server valida lo mismo y aborta el RPC.
+  const operatorMaxDiscountPct = maxDiscountFor(current.employee?.role ?? null);
 
   const [tires, setTires] = useState<TireV2[]>([]);
   const [overridesByTire, setOverridesByTire] = useState<Map<string, TireStoreOverride>>(new Map());
@@ -214,10 +226,26 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
     if (!ticketDiscount) return 0;
     const v = ticketDiscount.value ?? Number(pendingDiscountValue);
     if (!Number.isFinite(v) || v <= 0) return 0;
-    if (ticketDiscount.type === 'percent') {
-      return Math.min(subtotal, subtotal * (v / 100));
+    const raw = ticketDiscount.type === 'percent'
+      ? Math.min(subtotal, subtotal * (v / 100))
+      : Math.min(subtotal, v);
+    // Tope del rol: el monto resultante no puede exceder operatorMaxDiscountPct%
+    // del subtotal. Si el descuento configurado excede, se trunca al cap.
+    if (subtotal > 0 && operatorMaxDiscountPct < 100) {
+      const cap = subtotal * (operatorMaxDiscountPct / 100);
+      return Math.min(raw, cap);
     }
-    return Math.min(subtotal, v);
+    return raw;
+  })();
+  // Detección de truncado: ticket se intentó aplicar descuento mayor al tope.
+  const ticketDiscountWasCapped = (() => {
+    if (!ticketDiscount || subtotal <= 0) return false;
+    const v = ticketDiscount.value ?? Number(pendingDiscountValue);
+    if (!Number.isFinite(v) || v <= 0) return false;
+    const raw = ticketDiscount.type === 'percent'
+      ? Math.min(subtotal, subtotal * (v / 100))
+      : Math.min(subtotal, v);
+    return operatorMaxDiscountPct < 100 && raw > ticketDiscountAmount + 0.005;
   })();
   const subtotalAfterDiscount = Math.max(0, subtotal - ticketDiscountAmount);
 
@@ -301,7 +329,8 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
     );
   }
 
-  const canCheckout = cart.length > 0 && cashSession !== null && employeeId !== null;
+  const accountRequiresCustomer = isAccountPaymentMethod(selectedPm) && !customerId;
+  const canCheckout = cart.length > 0 && cashSession !== null && employeeId !== null && !accountRequiresCustomer;
 
   function checkout() {
     if (!cashSession) {
@@ -315,6 +344,25 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
     if (!paymentMethodId) {
       addToast('Seleccioná un método de pago.', 'warning');
       return;
+    }
+    if (isAccountPaymentMethod(selectedPm) && !customerId) {
+      addToast('Para cobrar con Cuenta Corriente seleccioná un cliente.', 'warning');
+      return;
+    }
+    // Migration 0019: si paga con cuenta corriente, anticipamos que el server
+    // rechaza el charge si supera credit_limit > 0 del cliente.
+    if (isAccountPaymentMethod(selectedPm) && selectedCustomer && selectedCustomer.creditLimit > 0) {
+      const projected = (selectedCustomer.accountBalance ?? 0) + total;
+      if (projected > selectedCustomer.creditLimit + 0.01) {
+        addToast(
+          `Este cargo dejaría al cliente sobre el cupo ($${projected.toFixed(2)} > $${selectedCustomer.creditLimit.toFixed(2)}).`,
+          'warning',
+        );
+        return;
+      }
+    }
+    if (ticketDiscountWasCapped) {
+      addToast(`Descuento truncado al ${operatorMaxDiscountPct}% (tope de tu rol).`, 'info');
     }
     setCheckoutOpen(true);
   }
@@ -338,6 +386,10 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
     const resolvedDiscount = resolvedTicketDiscount();
     if (ticketDiscount && !resolvedDiscount) {
       addToast('Ingresá el valor del descuento.', 'warning');
+      return;
+    }
+    if (isAccountPaymentMethod(selectedPm) && !customerId) {
+      addToast('Para cobrar con Cuenta Corriente seleccioná un cliente.', 'warning');
       return;
     }
     confirmingRef.current = true;
@@ -406,7 +458,22 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
       newOverrides.forEach(o => m.set(o.tireId, o));
       setOverridesByTire(m);
     } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Error registrando venta.', 'error');
+      // Errores conocidos del backend (errcode 23514 con hint):
+      //   - 'max_discount_exceeded': migration 0020 (tope descuento por rol)
+      //   - 'credit_limit_exceeded': migration 0019 (cupo de crédito)
+      //   - 'negative_stock': migration 0018 (stock insuficiente)
+      const raw = e instanceof Error ? e.message : String(e);
+      let msg = raw;
+      if (/max_discount_exceeded/i.test(raw)) {
+        msg = `Descuento aplicado supera el tope de tu rol (${operatorMaxDiscountPct}%).`;
+      } else if (/credit_limit_exceeded/i.test(raw)) {
+        msg = 'El cargo excede el cupo de crédito del cliente.';
+      } else if (/negative_stock/i.test(raw)) {
+        msg = 'Stock insuficiente para una o más cubiertas de esta venta.';
+      } else if (!(e instanceof Error)) {
+        msg = 'Error registrando venta.';
+      }
+      addToast(msg, 'error');
     } finally {
       setConfirming(false);
       confirmingRef.current = false;
@@ -704,7 +771,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         <div className="p-4 space-y-3" style={{ borderTop: '1px solid var(--br-bor)' }}>
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
-              Cliente (opcional)
+              Cliente {isAccountPaymentMethod(selectedPm) ? '(requerido por Cuenta Corriente)' : '(opcional)'}
             </label>
             <Select
               value={customerId}
@@ -713,6 +780,11 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               <option value="">Sin cliente</option>
               {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
+            {isAccountPaymentMethod(selectedPm) && !customerId && (
+              <p className="text-[11px] mt-1" style={{ color: 'var(--br-red)' }}>
+                Cuenta Corriente exige un cliente: la deuda se asienta a su cuenta.
+              </p>
+            )}
             {loyalty.enabled && selectedCustomer && customerPointsBalance > 0 && (
               <div className="mt-2">
                 <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>

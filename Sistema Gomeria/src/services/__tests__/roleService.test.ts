@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { Role } from '@/types';
-import { hasPermission } from '../roleService';
+import { hasPermission, maxDiscountFor } from '../roleService';
 
 const cajero: Role = {
   id: 'r-cajero',
   name: 'Cajero',
   isSystem: true,
+  maxDiscountPercent: 100,
   permissions: ['pos.sell', 'pos.discount', 'pos.openTickets', 'pos.openCash', 'pos.closeCash', 'customers.view'],
 };
 
@@ -13,6 +14,7 @@ const propietario: Role = {
   id: 'r-prop',
   name: 'Propietario',
   isSystem: true,
+  maxDiscountPercent: 100,
   permissions: [
     'pos.sell', 'pos.refund', 'pos.discount', 'pos.openTickets',
     'pos.openCash', 'pos.closeCash', 'pos.cashMovement',
@@ -52,5 +54,31 @@ describe('hasPermission', () => {
     expect(hasPermission(cajero, 'tires.manage')).toBe(false);
     expect(hasPermission(cajero, 'employees.manage')).toBe(false);
     expect(hasPermission(cajero, 'settings.manage')).toBe(false);
+  });
+});
+
+describe('maxDiscountFor', () => {
+  it('retorna 100 si role es null/undefined (sin tope por defecto)', () => {
+    expect(maxDiscountFor(null)).toBe(100);
+    expect(maxDiscountFor(undefined)).toBe(100);
+  });
+
+  it('retorna 100 si el rol tiene discounts.unrestricted', () => {
+    expect(maxDiscountFor(propietario)).toBe(100);
+  });
+
+  it('respeta maxDiscountPercent cuando no tiene discounts.unrestricted', () => {
+    const limited: Role = { ...cajero, maxDiscountPercent: 15 };
+    expect(maxDiscountFor(limited)).toBe(15);
+  });
+
+  it('fallback a 100 si maxDiscountPercent es undefined (rol legacy sin migrar)', () => {
+    const legacy = { ...cajero, maxDiscountPercent: undefined as unknown as number };
+    expect(maxDiscountFor(legacy)).toBe(100);
+  });
+
+  it('un cajero con tope 0% no puede aplicar descuento', () => {
+    const noDiscount: Role = { ...cajero, maxDiscountPercent: 0 };
+    expect(maxDiscountFor(noDiscount)).toBe(0);
   });
 });
