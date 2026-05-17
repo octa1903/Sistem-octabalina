@@ -185,6 +185,7 @@ export interface Store {
   description?: string;
   posDeviceName: string;
   active: boolean;
+  fiscalIdentity?: FiscalIdentity; // migration 0024
   createdAt: string;
   updatedAt: string;
 }
@@ -298,6 +299,7 @@ export interface Role {
   name: string;
   permissions: Permission[];
   isSystem: boolean;
+  maxDiscountPercent: number; // 0..100 (100 = sin tope). Ver migration 0020.
 }
 
 export interface Employee {
@@ -334,9 +336,86 @@ export interface Customer {
   creditLimit: number;
   accountBalance: number;
   pinHash?: string;
-  customerType: 'retail' | 'wholesale';
+  customerType: 'retail' | 'wholesale' | 'insured';
   wholesaleDiscount?: number;
+  defaultSalespersonId?: string; // FK salespeople — migration 0022
+  // Campos de import legacy — migration 0023
+  legacyId?: string;
+  legacyCuit?: string;
+  importStoreId?: string;
+  importBatchId?: string;
+  deletedAt?: string;
   authUserId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Aseguradoras + pólizas (migration 0021) ────────
+
+export interface InsuranceCompany {
+  id: string;
+  name: string;
+  cuit?: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  address?: Address;
+  accountBalance: number;
+  notes?: string;
+  legacyId?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InsurancePolicy {
+  id: string;
+  storeId?: string;
+  customerId?: string;
+  insuranceCompanyId: string;
+  policyNumber: string;
+  vehicleModel?: string;
+  vehiclePlate?: string;
+  insuredName?: string;
+  insuredAddress?: string;
+  insuredPhones?: string;
+  legacyId?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InsuranceCompanyMovement {
+  id: string;
+  insuranceCompanyId: string;
+  type: 'charge' | 'payment';
+  amount: number;
+  paymentMethodId?: string;
+  notes?: string;
+  receiptId?: string;
+  employeeId?: string;
+  at: string;
+}
+
+export interface InsuranceSplit {
+  customerAmount: number;
+  insuranceAmount: number;
+  deductible?: number;
+  claimNumber?: string;
+}
+
+// ── Vendedores (migration 0022) ────────────────────
+
+export interface Salesperson {
+  id: string;
+  storeId?: string;
+  name: string;
+  cuit?: string;
+  email?: string;
+  phone?: string;
+  defaultCommissionPct: number;
+  legacyId?: string;
+  active: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -424,7 +503,142 @@ export interface Receipt {
   pointsEarned: number;
   pointsRedeemed: number;
   notes?: string;
+  // Insurance split — migration 0021
+  insurancePolicyId?: string;
+  insuranceSplit?: InsuranceSplit;
+  // Vendedor — migration 0022
+  salespersonId?: string;
+  salespersonCommissionPct?: number;
+  salespersonCommissionAmount?: number;
+  // Campos de import legacy — migration 0023
+  legacyId?: string;
+  legacyNumber?: string;
+  afipData?: AfipReceiptData;
+  issuedAt?: string;
+  vehicleOwnerName?: string;
+  importBatchId?: string;
   createdAt: string;
+}
+
+// ── AFIP histórico (migration 0023) ────────────────
+
+export interface AfipReceiptData {
+  type: 'A' | 'B' | 'C' | 'X';
+  cae?: string;
+  caeVencimiento?: string;
+  puntoVenta?: string;
+  numero?: string;
+  importeNeto?: number;
+  importeIva?: number;
+  importeTotal?: number;
+}
+
+// ── Import legacy (migration 0023) ─────────────────
+
+export interface ImportBatch {
+  id: string;
+  source: string;
+  startedAt: string;
+  finishedAt?: string;
+  status: 'running' | 'completed' | 'failed' | 'rolled_back';
+  totalRows: number;
+  insertedRows: number;
+  skippedRows: number;
+  errors: unknown[];
+  notes?: string;
+  storeId?: string;
+  triggeredByEmployeeId?: string;
+  createdAt: string;
+}
+
+// ── Suppliers / Banks / Checks (migration 0023) ────
+
+export interface Supplier {
+  id: string;
+  name: string;
+  legalName?: string;
+  cuit?: string;
+  phone?: string;
+  cell?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  rubro?: string;
+  fiscalPosition?: string;
+  retentionPct?: number;
+  category?: string;
+  contactName?: string;
+  notes?: string;
+  legacyId?: string;
+  importBatchId?: string;
+  accountBalance: number;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Bank {
+  id: string;
+  name: string;
+  branch?: string;
+  address?: string;
+  legacyId?: string;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Check {
+  id: string;
+  checkNumber: string;
+  bankId?: string;
+  customerId?: string;
+  supplierId?: string;
+  type: 'incoming' | 'outgoing';
+  amount: number;
+  emissionDate?: string;
+  collectionDate?: string;
+  entryDate?: string;
+  exitDate?: string;
+  givenBy?: string;
+  givenTo?: string;
+  detail?: string;
+  cashed: boolean;
+  status?: string;
+  receiptId?: string;
+  legacyId?: string;
+  importBatchId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SupplierAccountMovement {
+  id: string;
+  supplierId: string;
+  type: 'charge' | 'payment';
+  amount: number;
+  paymentMethodId?: string;
+  notes?: string;
+  supplierInvoiceId?: string;
+  receiptId?: string;
+  employeeId?: string;
+  legacyId?: string;
+  importBatchId?: string;
+  at: string;
+}
+
+// ── Fiscal identity (migration 0024) ───────────────
+
+export interface FiscalIdentity {
+  razonSocial: string;
+  cuit: string;
+  iibb?: string;
+  inicioActiv?: string;
+  dirTel?: string;
+  localidad?: string;
+  ivaCondition?: string;
+  certAfipPath?: string;
+  claveAfipEncrypted?: string;
 }
 
 export interface CashMovement {

@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       app_features: {
@@ -65,6 +90,39 @@ export type Database = {
           migrated_from_local_at?: string | null
           schema_version?: number
           singleton?: boolean
+        }
+        Relationships: []
+      }
+      banks: {
+        Row: {
+          active: boolean
+          address: string | null
+          branch: string | null
+          created_at: string
+          id: string
+          legacy_id: string | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          address?: string | null
+          branch?: string | null
+          created_at?: string
+          id?: string
+          legacy_id?: string | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          address?: string | null
+          branch?: string | null
+          created_at?: string
+          id?: string
+          legacy_id?: string | null
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -201,6 +259,121 @@ export type Database = {
         }
         Relationships: []
       }
+      checks: {
+        Row: {
+          amount: number
+          bank_id: string | null
+          cashed: boolean
+          check_number: string
+          collection_date: string | null
+          created_at: string
+          customer_id: string | null
+          detail: string | null
+          emission_date: string | null
+          entry_date: string | null
+          exit_date: string | null
+          given_by: string | null
+          given_to: string | null
+          id: string
+          import_batch_id: string | null
+          legacy_id: string | null
+          receipt_id: string | null
+          status: string | null
+          supplier_id: string | null
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          bank_id?: string | null
+          cashed?: boolean
+          check_number: string
+          collection_date?: string | null
+          created_at?: string
+          customer_id?: string | null
+          detail?: string | null
+          emission_date?: string | null
+          entry_date?: string | null
+          exit_date?: string | null
+          given_by?: string | null
+          given_to?: string | null
+          id?: string
+          import_batch_id?: string | null
+          legacy_id?: string | null
+          receipt_id?: string | null
+          status?: string | null
+          supplier_id?: string | null
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          bank_id?: string | null
+          cashed?: boolean
+          check_number?: string
+          collection_date?: string | null
+          created_at?: string
+          customer_id?: string | null
+          detail?: string | null
+          emission_date?: string | null
+          entry_date?: string | null
+          exit_date?: string | null
+          given_by?: string | null
+          given_to?: string | null
+          id?: string
+          import_batch_id?: string | null
+          legacy_id?: string | null
+          receipt_id?: string | null
+          status?: string | null
+          supplier_id?: string | null
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checks_bank_id_fkey"
+            columns: ["bank_id"]
+            isOneToOne: false
+            referencedRelation: "banks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checks_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checks_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_active"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checks_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checks_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "checks_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customer_account_movements: {
         Row: {
           amount: number
@@ -208,6 +381,7 @@ export type Database = {
           customer_id: string
           employee_id: string | null
           id: string
+          import_batch_id: string | null
           notes: string | null
           payment_method_id: string | null
           receipt_id: string | null
@@ -219,6 +393,7 @@ export type Database = {
           customer_id: string
           employee_id?: string | null
           id?: string
+          import_batch_id?: string | null
           notes?: string | null
           payment_method_id?: string | null
           receipt_id?: string | null
@@ -230,6 +405,7 @@ export type Database = {
           customer_id?: string
           employee_id?: string | null
           id?: string
+          import_batch_id?: string | null
           notes?: string | null
           payment_method_id?: string | null
           receipt_id?: string | null
@@ -237,10 +413,24 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "cam_import_batch_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "customer_account_movements_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_account_movements_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_active"
             referencedColumns: ["id"]
           },
           {
@@ -349,6 +539,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "customer_orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_active"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "customer_orders_payment_method_id_fkey"
             columns: ["payment_method_id"]
             isOneToOne: false
@@ -380,11 +577,17 @@ export type Database = {
           created_at: string
           credit_limit: number
           customer_type: string
+          default_salesperson_id: string | null
+          deleted_at: string | null
           email: string | null
           first_visit: string | null
           id: string
+          import_batch_id: string | null
+          import_store_id: string | null
           label: string | null
           last_visit: string | null
+          legacy_cuit: string | null
+          legacy_id: string | null
           name: string
           note: string | null
           phone: string | null
@@ -403,11 +606,17 @@ export type Database = {
           created_at?: string
           credit_limit?: number
           customer_type?: string
+          default_salesperson_id?: string | null
+          deleted_at?: string | null
           email?: string | null
           first_visit?: string | null
           id?: string
+          import_batch_id?: string | null
+          import_store_id?: string | null
           label?: string | null
           last_visit?: string | null
+          legacy_cuit?: string | null
+          legacy_id?: string | null
           name: string
           note?: string | null
           phone?: string | null
@@ -426,11 +635,17 @@ export type Database = {
           created_at?: string
           credit_limit?: number
           customer_type?: string
+          default_salesperson_id?: string | null
+          deleted_at?: string | null
           email?: string | null
           first_visit?: string | null
           id?: string
+          import_batch_id?: string | null
+          import_store_id?: string | null
           label?: string | null
           last_visit?: string | null
+          legacy_cuit?: string | null
+          legacy_id?: string | null
           name?: string
           note?: string | null
           phone?: string | null
@@ -441,7 +656,29 @@ export type Database = {
           updated_at?: string
           wholesale_discount?: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "customers_default_salesperson_id_fkey"
+            columns: ["default_salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "salespeople"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_import_batch_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_import_store_id_fkey"
+            columns: ["import_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       discounts: {
         Row: {
@@ -513,6 +750,262 @@ export type Database = {
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      import_batches: {
+        Row: {
+          created_at: string
+          errors: Json
+          finished_at: string | null
+          id: string
+          inserted_rows: number
+          notes: string | null
+          skipped_rows: number
+          source: string
+          started_at: string
+          status: string
+          store_id: string | null
+          total_rows: number
+          triggered_by_employee_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          errors?: Json
+          finished_at?: string | null
+          id?: string
+          inserted_rows?: number
+          notes?: string | null
+          skipped_rows?: number
+          source: string
+          started_at?: string
+          status?: string
+          store_id?: string | null
+          total_rows?: number
+          triggered_by_employee_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          errors?: Json
+          finished_at?: string | null
+          id?: string
+          inserted_rows?: number
+          notes?: string | null
+          skipped_rows?: number
+          source?: string
+          started_at?: string
+          status?: string
+          store_id?: string | null
+          total_rows?: number
+          triggered_by_employee_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_batches_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "import_batches_triggered_by_employee_id_fkey"
+            columns: ["triggered_by_employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insurance_companies: {
+        Row: {
+          account_balance: number
+          active: boolean
+          address: Json | null
+          contact_name: string | null
+          created_at: string
+          cuit: string | null
+          email: string | null
+          id: string
+          legacy_id: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_balance?: number
+          active?: boolean
+          address?: Json | null
+          contact_name?: string | null
+          created_at?: string
+          cuit?: string | null
+          email?: string | null
+          id?: string
+          legacy_id?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_balance?: number
+          active?: boolean
+          address?: Json | null
+          contact_name?: string | null
+          created_at?: string
+          cuit?: string | null
+          email?: string | null
+          id?: string
+          legacy_id?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      insurance_company_movements: {
+        Row: {
+          amount: number
+          at: string
+          employee_id: string | null
+          id: string
+          insurance_company_id: string
+          notes: string | null
+          payment_method_id: string | null
+          receipt_id: string | null
+          type: string
+        }
+        Insert: {
+          amount: number
+          at?: string
+          employee_id?: string | null
+          id?: string
+          insurance_company_id: string
+          notes?: string | null
+          payment_method_id?: string | null
+          receipt_id?: string | null
+          type: string
+        }
+        Update: {
+          amount?: number
+          at?: string
+          employee_id?: string | null
+          id?: string
+          insurance_company_id?: string
+          notes?: string | null
+          payment_method_id?: string | null
+          receipt_id?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_company_movements_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_company_movements_insurance_company_id_fkey"
+            columns: ["insurance_company_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_company_movements_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_company_movements_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      insurance_policies: {
+        Row: {
+          active: boolean
+          created_at: string
+          customer_id: string | null
+          id: string
+          insurance_company_id: string
+          insured_address: string | null
+          insured_name: string | null
+          insured_phones: string | null
+          legacy_id: string | null
+          policy_number: string
+          store_id: string | null
+          updated_at: string
+          vehicle_model: string | null
+          vehicle_plate: string | null
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          insurance_company_id: string
+          insured_address?: string | null
+          insured_name?: string | null
+          insured_phones?: string | null
+          legacy_id?: string | null
+          policy_number: string
+          store_id?: string | null
+          updated_at?: string
+          vehicle_model?: string | null
+          vehicle_plate?: string | null
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          insurance_company_id?: string
+          insured_address?: string | null
+          insured_name?: string | null
+          insured_phones?: string | null
+          legacy_id?: string | null
+          policy_number?: string
+          store_id?: string | null
+          updated_at?: string
+          vehicle_model?: string | null
+          vehicle_plate?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "insurance_policies_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_policies_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_active"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_policies_insurance_company_id_fkey"
+            columns: ["insurance_company_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "insurance_policies_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
             referencedColumns: ["id"]
           },
         ]
@@ -682,8 +1175,8 @@ export type Database = {
       }
       receipt_lines: {
         Row: {
-          category_id: string
-          category_name: string
+          category_id: string | null
+          category_name: string | null
           gross: number
           id: string
           line_discounts: Json
@@ -692,17 +1185,17 @@ export type Database = {
           net: number
           quantity: number
           receipt_id: string
-          tire_brand: string
-          tire_id: string
-          tire_model: string
-          tire_size: string
+          tire_brand: string | null
+          tire_id: string | null
+          tire_model: string | null
+          tire_size: string | null
           total: number
-          unit_cost: number
+          unit_cost: number | null
           unit_price: number
         }
         Insert: {
-          category_id: string
-          category_name: string
+          category_id?: string | null
+          category_name?: string | null
           gross: number
           id?: string
           line_discounts?: Json
@@ -711,17 +1204,17 @@ export type Database = {
           net: number
           quantity: number
           receipt_id: string
-          tire_brand: string
-          tire_id: string
-          tire_model: string
-          tire_size: string
+          tire_brand?: string | null
+          tire_id?: string | null
+          tire_model?: string | null
+          tire_size?: string | null
           total: number
-          unit_cost: number
+          unit_cost?: number | null
           unit_price: number
         }
         Update: {
-          category_id?: string
-          category_name?: string
+          category_id?: string | null
+          category_name?: string | null
           gross?: number
           id?: string
           line_discounts?: Json
@@ -730,12 +1223,12 @@ export type Database = {
           net?: number
           quantity?: number
           receipt_id?: string
-          tire_brand?: string
-          tire_id?: string
-          tire_model?: string
-          tire_size?: string
+          tire_brand?: string | null
+          tire_id?: string | null
+          tire_model?: string | null
+          tire_size?: string | null
           total?: number
-          unit_cost?: number
+          unit_cost?: number | null
           unit_price?: number
         }
         Relationships: [
@@ -757,6 +1250,7 @@ export type Database = {
       }
       receipts: {
         Row: {
+          afip_data: Json | null
           applied_discounts: Json
           applied_taxes: Json
           cash_session_id: string
@@ -764,6 +1258,12 @@ export type Database = {
           customer_id: string | null
           employee_id: string
           id: string
+          import_batch_id: string | null
+          insurance_policy_id: string | null
+          insurance_split: Json | null
+          issued_at: string | null
+          legacy_id: string | null
+          legacy_number: string | null
           notes: string | null
           parked_name: string | null
           payments: Json
@@ -771,6 +1271,9 @@ export type Database = {
           points_redeemed: number
           receipt_number: string
           refund_of_receipt_id: string | null
+          salesperson_commission_amount: number | null
+          salesperson_commission_pct: number | null
+          salesperson_id: string | null
           status: string
           store_id: string
           subtotal_gross: number
@@ -780,8 +1283,10 @@ export type Database = {
           total_discounts: number
           total_taxes: number
           type: string
+          vehicle_owner_name: string | null
         }
         Insert: {
+          afip_data?: Json | null
           applied_discounts?: Json
           applied_taxes?: Json
           cash_session_id: string
@@ -789,6 +1294,12 @@ export type Database = {
           customer_id?: string | null
           employee_id: string
           id?: string
+          import_batch_id?: string | null
+          insurance_policy_id?: string | null
+          insurance_split?: Json | null
+          issued_at?: string | null
+          legacy_id?: string | null
+          legacy_number?: string | null
           notes?: string | null
           parked_name?: string | null
           payments?: Json
@@ -796,6 +1307,9 @@ export type Database = {
           points_redeemed?: number
           receipt_number: string
           refund_of_receipt_id?: string | null
+          salesperson_commission_amount?: number | null
+          salesperson_commission_pct?: number | null
+          salesperson_id?: string | null
           status: string
           store_id: string
           subtotal_gross: number
@@ -805,8 +1319,10 @@ export type Database = {
           total_discounts: number
           total_taxes: number
           type: string
+          vehicle_owner_name?: string | null
         }
         Update: {
+          afip_data?: Json | null
           applied_discounts?: Json
           applied_taxes?: Json
           cash_session_id?: string
@@ -814,6 +1330,12 @@ export type Database = {
           customer_id?: string | null
           employee_id?: string
           id?: string
+          import_batch_id?: string | null
+          insurance_policy_id?: string | null
+          insurance_split?: Json | null
+          issued_at?: string | null
+          legacy_id?: string | null
+          legacy_number?: string | null
           notes?: string | null
           parked_name?: string | null
           payments?: Json
@@ -821,6 +1343,9 @@ export type Database = {
           points_redeemed?: number
           receipt_number?: string
           refund_of_receipt_id?: string | null
+          salesperson_commission_amount?: number | null
+          salesperson_commission_pct?: number | null
+          salesperson_id?: string | null
           status?: string
           store_id?: string
           subtotal_gross?: number
@@ -830,6 +1355,7 @@ export type Database = {
           total_discounts?: number
           total_taxes?: number
           type?: string
+          vehicle_owner_name?: string | null
         }
         Relationships: [
           {
@@ -847,6 +1373,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "receipts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers_active"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "receipts_employee_id_fkey"
             columns: ["employee_id"]
             isOneToOne: false
@@ -854,10 +1387,31 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "receipts_import_batch_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_insurance_policy_id_fkey"
+            columns: ["insurance_policy_id"]
+            isOneToOne: false
+            referencedRelation: "insurance_policies"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "receipts_refund_of_receipt_id_fkey"
             columns: ["refund_of_receipt_id"]
             isOneToOne: false
             referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receipts_salesperson_id_fkey"
+            columns: ["salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "salespeople"
             referencedColumns: ["id"]
           },
           {
@@ -873,22 +1427,75 @@ export type Database = {
         Row: {
           id: string
           is_system: boolean
+          max_discount_percent: number
           name: string
           permissions: string[]
         }
         Insert: {
           id?: string
           is_system?: boolean
+          max_discount_percent?: number
           name: string
           permissions?: string[]
         }
         Update: {
           id?: string
           is_system?: boolean
+          max_discount_percent?: number
           name?: string
           permissions?: string[]
         }
         Relationships: []
+      }
+      salespeople: {
+        Row: {
+          active: boolean
+          created_at: string
+          cuit: string | null
+          default_commission_pct: number
+          email: string | null
+          id: string
+          legacy_id: string | null
+          name: string
+          phone: string | null
+          store_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          cuit?: string | null
+          default_commission_pct?: number
+          email?: string | null
+          id?: string
+          legacy_id?: string | null
+          name: string
+          phone?: string | null
+          store_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          cuit?: string | null
+          default_commission_pct?: number
+          email?: string | null
+          id?: string
+          legacy_id?: string | null
+          name?: string
+          phone?: string | null
+          store_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "salespeople_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stores: {
         Row: {
@@ -896,6 +1503,7 @@ export type Database = {
           address: Json | null
           created_at: string
           description: string | null
+          fiscal_identity: Json | null
           id: string
           name: string
           phone: string | null
@@ -907,6 +1515,7 @@ export type Database = {
           address?: Json | null
           created_at?: string
           description?: string | null
+          fiscal_identity?: Json | null
           id?: string
           name: string
           phone?: string | null
@@ -918,6 +1527,7 @@ export type Database = {
           address?: Json | null
           created_at?: string
           description?: string | null
+          fiscal_identity?: Json | null
           id?: string
           name?: string
           phone?: string | null
@@ -925,6 +1535,94 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      supplier_account_movements: {
+        Row: {
+          amount: number
+          at: string
+          employee_id: string | null
+          id: string
+          import_batch_id: string | null
+          legacy_id: string | null
+          notes: string | null
+          payment_method_id: string | null
+          receipt_id: string | null
+          supplier_id: string
+          supplier_invoice_id: string | null
+          type: string
+        }
+        Insert: {
+          amount: number
+          at?: string
+          employee_id?: string | null
+          id?: string
+          import_batch_id?: string | null
+          legacy_id?: string | null
+          notes?: string | null
+          payment_method_id?: string | null
+          receipt_id?: string | null
+          supplier_id: string
+          supplier_invoice_id?: string | null
+          type: string
+        }
+        Update: {
+          amount?: number
+          at?: string
+          employee_id?: string | null
+          id?: string
+          import_batch_id?: string | null
+          legacy_id?: string | null
+          notes?: string | null
+          payment_method_id?: string | null
+          receipt_id?: string | null
+          supplier_id?: string
+          supplier_invoice_id?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_account_movements_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_account_movements_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_account_movements_payment_method_id_fkey"
+            columns: ["payment_method_id"]
+            isOneToOne: false
+            referencedRelation: "payment_methods"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_account_movements_receipt_id_fkey"
+            columns: ["receipt_id"]
+            isOneToOne: false
+            referencedRelation: "receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_account_movements_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_account_movements_supplier_invoice_id_fkey"
+            columns: ["supplier_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       supplier_invoices: {
         Row: {
@@ -940,6 +1638,7 @@ export type Database = {
           store_id: string | null
           subtotal: number
           supplier: string
+          supplier_id: string | null
           total: number
           type: string
           updated_at: string
@@ -957,6 +1656,7 @@ export type Database = {
           store_id?: string | null
           subtotal?: number
           supplier: string
+          supplier_id?: string | null
           total?: number
           type: string
           updated_at?: string
@@ -974,6 +1674,7 @@ export type Database = {
           store_id?: string | null
           subtotal?: number
           supplier?: string
+          supplier_id?: string | null
           total?: number
           type?: string
           updated_at?: string
@@ -984,6 +1685,93 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_invoices_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suppliers: {
+        Row: {
+          account_balance: number
+          active: boolean
+          address: string | null
+          category: string | null
+          cell: string | null
+          city: string | null
+          contact_name: string | null
+          created_at: string
+          cuit: string | null
+          email: string | null
+          fiscal_position: string | null
+          id: string
+          import_batch_id: string | null
+          legacy_id: string | null
+          legal_name: string | null
+          name: string
+          notes: string | null
+          phone: string | null
+          retention_pct: number | null
+          rubro: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_balance?: number
+          active?: boolean
+          address?: string | null
+          category?: string | null
+          cell?: string | null
+          city?: string | null
+          contact_name?: string | null
+          created_at?: string
+          cuit?: string | null
+          email?: string | null
+          fiscal_position?: string | null
+          id?: string
+          import_batch_id?: string | null
+          legacy_id?: string | null
+          legal_name?: string | null
+          name: string
+          notes?: string | null
+          phone?: string | null
+          retention_pct?: number | null
+          rubro?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_balance?: number
+          active?: boolean
+          address?: string | null
+          category?: string | null
+          cell?: string | null
+          city?: string | null
+          contact_name?: string | null
+          created_at?: string
+          cuit?: string | null
+          email?: string | null
+          fiscal_position?: string | null
+          id?: string
+          import_batch_id?: string | null
+          legacy_id?: string | null
+          legal_name?: string | null
+          name?: string
+          notes?: string | null
+          phone?: string | null
+          retention_pct?: number | null
+          rubro?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suppliers_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
             referencedColumns: ["id"]
           },
         ]
@@ -1157,6 +1945,118 @@ export type Database = {
       }
     }
     Views: {
+      customers_active: {
+        Row: {
+          account_balance: number | null
+          address: Json | null
+          auth_user_id: string | null
+          birthday: string | null
+          created_at: string | null
+          credit_limit: number | null
+          customer_type: string | null
+          default_salesperson_id: string | null
+          deleted_at: string | null
+          email: string | null
+          first_visit: string | null
+          id: string | null
+          import_batch_id: string | null
+          import_store_id: string | null
+          label: string | null
+          last_visit: string | null
+          legacy_cuit: string | null
+          legacy_id: string | null
+          name: string | null
+          note: string | null
+          phone: string | null
+          pin_hash: string | null
+          points_balance: number | null
+          total_spent: number | null
+          total_visits: number | null
+          updated_at: string | null
+          wholesale_discount: number | null
+        }
+        Insert: {
+          account_balance?: number | null
+          address?: Json | null
+          auth_user_id?: string | null
+          birthday?: string | null
+          created_at?: string | null
+          credit_limit?: number | null
+          customer_type?: string | null
+          default_salesperson_id?: string | null
+          deleted_at?: string | null
+          email?: string | null
+          first_visit?: string | null
+          id?: string | null
+          import_batch_id?: string | null
+          import_store_id?: string | null
+          label?: string | null
+          last_visit?: string | null
+          legacy_cuit?: string | null
+          legacy_id?: string | null
+          name?: string | null
+          note?: string | null
+          phone?: string | null
+          pin_hash?: string | null
+          points_balance?: number | null
+          total_spent?: number | null
+          total_visits?: number | null
+          updated_at?: string | null
+          wholesale_discount?: number | null
+        }
+        Update: {
+          account_balance?: number | null
+          address?: Json | null
+          auth_user_id?: string | null
+          birthday?: string | null
+          created_at?: string | null
+          credit_limit?: number | null
+          customer_type?: string | null
+          default_salesperson_id?: string | null
+          deleted_at?: string | null
+          email?: string | null
+          first_visit?: string | null
+          id?: string | null
+          import_batch_id?: string | null
+          import_store_id?: string | null
+          label?: string | null
+          last_visit?: string | null
+          legacy_cuit?: string | null
+          legacy_id?: string | null
+          name?: string | null
+          note?: string | null
+          phone?: string | null
+          pin_hash?: string | null
+          points_balance?: number | null
+          total_spent?: number | null
+          total_visits?: number | null
+          updated_at?: string | null
+          wholesale_discount?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_default_salesperson_id_fkey"
+            columns: ["default_salesperson_id"]
+            isOneToOne: false
+            referencedRelation: "salespeople"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_import_batch_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_import_store_id_fkey"
+            columns: ["import_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       daily_sales_summary: {
         Row: {
           cogs: number | null
@@ -1284,8 +2184,10 @@ export type Database = {
       }
       current_employee_has_permission: { Args: { p: string }; Returns: boolean }
       current_employee_id: { Args: never; Returns: string }
+      current_employee_max_discount: { Args: never; Returns: number }
       current_employee_role: { Args: never; Returns: string }
       current_employee_store_ids: { Args: never; Returns: string[] }
+      customer_in_scope: { Args: { p_customer_id: string }; Returns: boolean }
       customer_login: {
         Args: { p_customer_id: string; p_pin: string }
         Returns: {
@@ -1310,6 +2212,14 @@ export type Database = {
       }
       recompute_customer_metrics: {
         Args: { p_customer_id: string }
+        Returns: undefined
+      }
+      recompute_insurance_company_balance: {
+        Args: { p_id: string }
+        Returns: undefined
+      }
+      recompute_supplier_account_balance: {
+        Args: { p_supplier_id: string }
         Returns: undefined
       }
       store_in_scope: { Args: { p_store_id: string }; Returns: boolean }
@@ -1441,6 +2351,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
