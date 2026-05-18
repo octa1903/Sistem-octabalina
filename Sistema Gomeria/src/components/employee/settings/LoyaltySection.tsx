@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { LoyaltyConfig } from '@/types';
 import { loyaltyConfigService } from '@/services/loyaltyConfigService';
 import { Star } from 'lucide-react';
+import { Button } from '@/components/ui';
 
 interface Props {
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
@@ -66,10 +67,11 @@ export function LoyaltySection({ addToast }: Props) {
             </label>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
+              <label htmlFor="loyalty-earn-percent" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
                 % del subtotal neto que acumula
               </label>
               <input
+                id="loyalty-earn-percent"
                 type="number"
                 min={0}
                 max={100}
@@ -77,7 +79,7 @@ export function LoyaltySection({ addToast }: Props) {
                 value={config.earnPercent}
                 onChange={(e) => setConfig({ ...config, earnPercent: Number(e.target.value) })}
                 disabled={saving || !config.enabled}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
               <p className="text-xs mt-1" style={{ color: 'var(--br-txt2)' }}>
@@ -87,14 +89,9 @@ export function LoyaltySection({ addToast }: Props) {
             </div>
 
             <div className="flex justify-end pt-2">
-              <button
-                onClick={save}
-                disabled={saving}
-                className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-                style={{ background: 'var(--br-amb)' }}
-              >
-                {saving ? 'Guardando...' : 'Guardar'}
-              </button>
+              <Button variant="primary" onClick={save} loading={saving}>
+                Guardar
+              </Button>
             </div>
           </>
         )}

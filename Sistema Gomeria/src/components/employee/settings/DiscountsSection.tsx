@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Discount } from '@/types';
 import { discountService } from '@/services/discountService';
 import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui';
+import { Button, IconButton } from '@/components/ui';
 import { Plus, Edit2, Trash2, Tag } from 'lucide-react';
 
 interface Props {
@@ -147,13 +147,9 @@ export function DiscountsSection({ addToast }: Props) {
                   {d.value === null && ' · el cajero ingresa el valor en cada venta'}
                 </p>
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => openEdit(d)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }}>
-                  <Edit2 className="h-4 w-4" />
-                </button>
-                <button onClick={() => setDeleting(d)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }}>
-                  <Trash2 className="h-4 w-4" />
-                </button>
+              <div className="flex gap-2">
+                <IconButton label={`Editar ${d.name}`} icon={<Edit2 className="h-4 w-4" />} tone="neutral" size="sm" bordered={false} onClick={() => openEdit(d)} />
+                <IconButton label={`Eliminar ${d.name}`} icon={<Trash2 className="h-4 w-4" />} tone="danger" size="sm" bordered={false} onClick={() => setDeleting(d)} />
               </div>
             </div>
           ))
@@ -163,25 +159,27 @@ export function DiscountsSection({ addToast }: Props) {
       <Modal open={modalOpen} onClose={() => !submitting && setModalOpen(false)} title={editing ? 'Editar descuento' : 'Nuevo descuento'} size="sm">
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Nombre</label>
+            <label htmlFor="discount-name" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Nombre</label>
             <input
+              id="discount-name"
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="Ej: Promo 10%, Descuento manual"
               autoFocus
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Tipo</label>
+            <label htmlFor="discount-type" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Tipo</label>
             <select
+              id="discount-type"
               value={form.type}
               onChange={(e) => setForm({ ...form, type: e.target.value as 'percent' | 'amount' })}
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             >
               <option value="percent">Porcentaje (%)</option>
@@ -189,10 +187,11 @@ export function DiscountsSection({ addToast }: Props) {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
+            <label htmlFor="discount-value" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
               Valor {form.type === 'percent' ? '(0–100)' : '($)'} — vacío = pedir en venta
             </label>
             <input
+              id="discount-value"
               type="number"
               min={0}
               step="0.01"
@@ -200,7 +199,7 @@ export function DiscountsSection({ addToast }: Props) {
               onChange={(e) => setForm({ ...form, value: e.target.value })}
               placeholder={form.type === 'percent' ? '10' : '500'}
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             />
           </div>

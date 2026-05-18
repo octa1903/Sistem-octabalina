@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { InsuranceCompany } from '@/types';
 import { insuranceCompanyService } from '@/services/insuranceCompanyService';
 import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui';
+import { Button, IconButton } from '@/components/ui';
 import { Plus, Edit2, Trash2, ShieldCheck } from 'lucide-react';
 
 interface Props {
@@ -151,13 +151,9 @@ export function InsuranceCompaniesSection({ addToast }: Props) {
                   {formatMoney(c.accountBalance)}
                 </p>
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => openEdit(c)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }}>
-                  <Edit2 className="h-4 w-4" />
-                </button>
-                <button onClick={() => setDeleting(c)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }}>
-                  <Trash2 className="h-4 w-4" />
-                </button>
+              <div className="flex gap-2">
+                <IconButton label={`Editar ${c.name}`} icon={<Edit2 className="h-4 w-4" />} tone="neutral" size="sm" bordered={false} onClick={() => openEdit(c)} />
+                <IconButton label={`Eliminar ${c.name}`} icon={<Trash2 className="h-4 w-4" />} tone="danger" size="sm" bordered={false} onClick={() => setDeleting(c)} />
               </div>
             </div>
           ))
@@ -167,62 +163,67 @@ export function InsuranceCompaniesSection({ addToast }: Props) {
       <Modal open={modalOpen} onClose={() => !submitting && setModalOpen(false)} title={editing ? 'Editar aseguradora' : 'Nueva aseguradora'} size="sm">
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Nombre *</label>
+            <label htmlFor="insurance-name" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Nombre *</label>
             <input
+              id="insurance-name"
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="San Cristóbal Seguros"
               autoFocus
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>CUIT</label>
+              <label htmlFor="insurance-cuit" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>CUIT</label>
               <input
+                id="insurance-cuit"
                 type="text"
                 value={form.cuit}
                 onChange={(e) => setForm({ ...form, cuit: e.target.value })}
                 disabled={submitting}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Contacto</label>
+              <label htmlFor="insurance-contact" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Contacto</label>
               <input
+                id="insurance-contact"
                 type="text"
                 value={form.contactName}
                 onChange={(e) => setForm({ ...form, contactName: e.target.value })}
                 disabled={submitting}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Teléfono</label>
+              <label htmlFor="insurance-phone" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Teléfono</label>
               <input
+                id="insurance-phone"
                 type="tel"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 disabled={submitting}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Email</label>
+              <label htmlFor="insurance-email" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Email</label>
               <input
+                id="insurance-email"
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 disabled={submitting}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
             </div>

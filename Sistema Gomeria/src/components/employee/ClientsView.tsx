@@ -133,7 +133,9 @@ export function ClientsView({ addToast }: Props) {
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Clientes</h1>
-          <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>{clients.length} clientes registrados</p>
+          <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
+            <span className="tabular-nums">{clients.length}</span> {clients.length === 1 ? 'cliente registrado' : 'clientes registrados'}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" iconLeft={<Upload className="h-4 w-4" />} onClick={() => setImportOpen(true)}>
@@ -165,20 +167,28 @@ export function ClientsView({ addToast }: Props) {
         </Select>
       </div>
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3" aria-busy="true" aria-label="Cargando clientes">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-xl h-28 motion-safe:animate-pulse"
+              style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)' }}
+            />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <div className="col-span-3">
           <EmptyState
             icon={User}
-            title={loading ? 'Cargando clientes...' : clients.length === 0 ? 'No hay clientes registrados' : 'Sin resultados'}
+            title={clients.length === 0 ? 'No hay clientes registrados' : 'Sin resultados'}
             description={
-              loading
-                ? undefined
-                : clients.length === 0
-                ? 'Creá el primer cliente con el botón "Nuevo cliente".'
+              clients.length === 0
+                ? 'Creá el primer cliente con el botón «Nuevo cliente».'
                 : 'Probá con otro término de búsqueda o cambiá el filtro.'
             }
             action={
-              !loading && clients.length === 0 ? (
+              clients.length === 0 ? (
                 <Button variant="primary" iconLeft={<Plus className="h-4 w-4" />} onClick={openNew}>
                   Nuevo cliente
                 </Button>
@@ -189,16 +199,26 @@ export function ClientsView({ addToast }: Props) {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filtered.map((c) => (
-            <div key={c.id} className="rounded-xl p-4 cursor-pointer transition-all"
+            <div key={c.id} className="relative rounded-xl p-4 transition-all hover:border-[var(--br-amb)] focus-within:border-[var(--br-amb)]"
               style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
-              onClick={() => setDetailClient(c)}
-              onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--br-amb)')}
-              onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--br-bor)')}
             >
-              <div className="flex items-start justify-between mb-2">
+              {/* Overlay button: cubre la card excepto la zona de acciones (acciones arriba en z) */}
+              <button
+                type="button"
+                onClick={() => setDetailClient(c)}
+                aria-label={`Ver detalle de ${c.name}`}
+                className="absolute inset-0 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-amb)]"
+              />
+              <div className="relative flex items-start justify-between mb-2 pointer-events-none">
                 <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0"
-                    style={{ background: c.tipoCliente === 'mayorista' ? 'var(--br-amb)' : 'var(--br-dark)' }}>
+                  <div
+                    className="w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm flex-shrink-0"
+                    style={{
+                      background: c.tipoCliente === 'mayorista' ? 'var(--br-amb)' : 'var(--br-dark)',
+                      color: 'var(--br-bg)',
+                    }}
+                    aria-hidden="true"
+                  >
                     {c.name.charAt(0).toUpperCase()}
                   </div>
                   <div>
@@ -209,9 +229,9 @@ export function ClientsView({ addToast }: Props) {
                     </span>
                   </div>
                 </div>
-                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+                <div className="flex gap-2 pointer-events-auto">
                   <IconButton
-                    label="Editar cliente"
+                    label={`Editar ${c.name}`}
                     icon={<Edit2 className="h-4 w-4" />}
                     tone="neutral"
                     size="sm"
@@ -219,7 +239,7 @@ export function ClientsView({ addToast }: Props) {
                     onClick={() => openEdit(c)}
                   />
                   <IconButton
-                    label="Eliminar cliente"
+                    label={`Eliminar ${c.name}`}
                     icon={<Trash2 className="h-4 w-4" />}
                     tone="danger"
                     size="sm"
@@ -228,13 +248,15 @@ export function ClientsView({ addToast }: Props) {
                   />
                 </div>
               </div>
-              {c.phone && <p className="text-xs flex items-center gap-1 mt-1" style={{ color: 'var(--br-txt2)' }}><Phone className="h-3 w-3" /> {c.phone}</p>}
-              {c.address && <p className="text-xs flex items-center gap-1 mt-0.5 truncate" style={{ color: 'var(--br-txt2)' }}><MapPin className="h-3 w-3" /> {c.address}</p>}
-              {c.balance !== 0 && (
-                <p className="text-sm font-semibold mt-2 font-mono" style={{ color: c.balance > 0 ? 'var(--br-red)' : 'var(--br-grn)' }}>
-                  {c.balance > 0 ? 'Debe: ' : 'Favor: '}{formatCurrency(Math.abs(c.balance))}
-                </p>
-              )}
+              <div className="relative pointer-events-none">
+                {c.phone && <p className="text-xs flex items-center gap-1 mt-1" style={{ color: 'var(--br-txt2)' }}><Phone className="h-3 w-3" aria-hidden="true" /> {c.phone}</p>}
+                {c.address && <p className="text-xs flex items-center gap-1 mt-0.5 truncate" style={{ color: 'var(--br-txt2)' }}><MapPin className="h-3 w-3" aria-hidden="true" /> {c.address}</p>}
+                {c.balance !== 0 && (
+                  <p className="text-sm font-semibold mt-2 font-mono tabular-nums" style={{ color: c.balance > 0 ? 'var(--br-red)' : 'var(--br-grn)' }}>
+                    {c.balance > 0 ? 'Debe: ' : 'Favor: '}{formatCurrency(Math.abs(c.balance))}
+                  </p>
+                )}
+              </div>
             </div>
           ))}
         </div>

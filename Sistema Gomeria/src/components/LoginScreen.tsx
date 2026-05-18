@@ -86,8 +86,9 @@ export function LoginScreen({ auth }: Props) {
       {/* Logo */}
       <div className="mb-8 text-center">
         <div
-          className="inline-flex items-center justify-center w-14 h-14 rounded-2xl text-white text-2xl font-bold mb-3 shadow-md"
-          style={{ background: 'var(--br-dark)' }}
+          aria-hidden="true"
+          className="inline-flex items-center justify-center w-14 h-14 rounded-2xl text-2xl font-bold mb-3 shadow-md"
+          style={{ background: 'var(--br-dark)', color: 'var(--br-bg)' }}
         >
           B
         </div>
@@ -95,7 +96,7 @@ export function LoginScreen({ auth }: Props) {
           Baliña Ruedas
         </h1>
         <p className="text-sm mt-1" style={{ color: 'var(--br-txt2)' }}>
-          Juan B. Justo 1980 · Mar del Plata
+          Juan B. Justo 1980, Mar del Plata
         </p>
       </div>
 
@@ -105,21 +106,27 @@ export function LoginScreen({ auth }: Props) {
         style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
       >
         {/* Tabs */}
-        <div className="flex" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-          {(['employee', 'client'] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => { setMode(t); auth.clearError(); }}
-              className="flex-1 py-3 text-sm font-semibold transition-colors"
-              style={{
-                color: mode === t ? 'var(--br-amb)' : 'var(--br-txt2)',
-                borderBottom: mode === t ? '2px solid var(--br-amb)' : '2px solid transparent',
-                background: 'none',
-              }}
-            >
-              {t === 'employee' ? 'Empleado' : 'Cliente'}
-            </button>
-          ))}
+        <div role="tablist" aria-label="Tipo de acceso" className="flex" style={{ borderBottom: '1px solid var(--br-bor)' }}>
+          {(['employee', 'client'] as const).map((t) => {
+            const active = mode === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                onClick={() => { setMode(t); auth.clearError(); }}
+                className="flex-1 py-3 text-sm font-semibold transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
+                style={{
+                  color: active ? 'var(--br-amb)' : 'var(--br-txt2)',
+                  borderBottom: active ? '2px solid var(--br-amb)' : '2px solid transparent',
+                  background: 'none',
+                }}
+              >
+                {t === 'employee' ? 'Empleado' : 'Cliente'}
+              </button>
+            );
+          })}
         </div>
 
         <div className="p-6">
@@ -127,17 +134,20 @@ export function LoginScreen({ auth }: Props) {
           {mode === 'employee' && (
             <form onSubmit={handleEmployee} className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
+                <label htmlFor="login-email" className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
                   Email
                 </label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50" />
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50" aria-hidden="true" />
                   <input
+                    id="login-email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="tu@email.com"
                     autoComplete="username"
+                    aria-invalid={!!auth.error || undefined}
+                    aria-describedby={auth.error ? 'login-employee-error' : undefined}
                     className="w-full pl-9 pr-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
                     style={{
                       border: '1px solid var(--br-bor)',
@@ -152,16 +162,19 @@ export function LoginScreen({ auth }: Props) {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
+                <label htmlFor="login-password" className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
                   Contraseña
                 </label>
                 <div className="relative">
                   <input
+                    id="login-password"
                     type={showPwd ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Ingrese contraseña"
                     autoComplete="current-password"
+                    aria-invalid={!!auth.error || undefined}
+                    aria-describedby={auth.error ? 'login-employee-error' : undefined}
                     className="w-full pr-10 pl-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
                     style={{
                       border: '1px solid var(--br-bor)',
@@ -174,7 +187,9 @@ export function LoginScreen({ auth }: Props) {
                   <button
                     type="button"
                     onClick={() => setShowPwd(!showPwd)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-80"
+                    aria-label={showPwd ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                    aria-pressed={showPwd}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 opacity-50 hover:opacity-80 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--br-amb)] rounded"
                   >
                     {showPwd ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -182,7 +197,7 @@ export function LoginScreen({ auth }: Props) {
               </div>
 
               {auth.error && (
-                <p className="text-sm rounded-lg px-3 py-2" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}>
+                <p id="login-employee-error" role="alert" className="text-sm rounded-lg px-3 py-2" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}>
                   {auth.error}
                 </p>
               )}
@@ -190,10 +205,10 @@ export function LoginScreen({ auth }: Props) {
               <button
                 type="submit"
                 disabled={loading || !email || !password}
-                className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-50"
+                className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--br-amb)] focus-visible:ring-offset-[var(--br-bg)]"
                 style={{ background: 'var(--br-dark)' }}
               >
-                <LogIn className="h-4 w-4" />
+                <LogIn className="h-4 w-4" aria-hidden="true" />
                 {loading ? 'Verificando...' : 'Ingresar como Empleado'}
               </button>
             </form>
@@ -204,14 +219,16 @@ export function LoginScreen({ auth }: Props) {
             <form onSubmit={handleClient} className="space-y-4">
               {!selectedClientId ? (
                 <div>
-                  <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
+                  <label htmlFor="login-client-search" className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
                     Buscar cliente
                   </label>
                   <input
+                    id="login-client-search"
                     type="text"
                     value={clientSearch}
                     onChange={(e) => setClientSearch(e.target.value)}
                     placeholder="Nombre del cliente..."
+                    aria-label="Buscar cliente por nombre"
                     className="w-full px-3 py-2.5 rounded-lg text-sm outline-none mb-2"
                     style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
                     onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
@@ -235,7 +252,7 @@ export function LoginScreen({ auth }: Props) {
                           key={c.id}
                           type="button"
                           onClick={() => setSelectedClientId(c.id)}
-                          className="w-full text-left px-3 py-2.5 text-sm transition-colors hover:bg-stone-50 flex items-center justify-between"
+                          className="w-full text-left px-3 py-2.5 text-sm transition-colors hover:bg-[var(--br-sur2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)] flex items-center justify-between"
                           style={{ borderBottom: '1px solid var(--br-bor)' }}
                         >
                           <span className="font-medium" style={{ color: 'var(--br-txt)' }}>{c.name}</span>
@@ -270,16 +287,20 @@ export function LoginScreen({ auth }: Props) {
                     </p>
                   ) : (
                     <>
-                      <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
+                      <label htmlFor="login-client-pin" className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
                         PIN
                       </label>
                       <input
+                        id="login-client-pin"
                         type="password"
                         inputMode="numeric"
                         maxLength={8}
                         value={pin}
                         onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
                         placeholder="••••"
+                        autoComplete="current-password"
+                        aria-invalid={!!auth.error || undefined}
+                        aria-describedby={auth.error ? 'login-client-error' : undefined}
                         className="w-full px-3 py-2.5 rounded-lg text-sm outline-none text-center tracking-widest"
                         style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
                         onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
@@ -292,7 +313,7 @@ export function LoginScreen({ auth }: Props) {
               )}
 
               {auth.error && (
-                <p className="text-sm rounded-lg px-3 py-2" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}>
+                <p id="login-client-error" role="alert" className="text-sm rounded-lg px-3 py-2" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}>
                   {auth.error}
                 </p>
               )}
@@ -301,10 +322,10 @@ export function LoginScreen({ auth }: Props) {
                 <button
                   type="submit"
                   disabled={loading || !pin}
-                  className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-50"
+                  className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--br-amb)] focus-visible:ring-offset-[var(--br-bg)]"
                   style={{ background: 'var(--br-dark)' }}
                 >
-                  <LogIn className="h-4 w-4" />
+                  <LogIn className="h-4 w-4" aria-hidden="true" />
                   {loading ? 'Verificando...' : 'Continuar →'}
                 </button>
               )}

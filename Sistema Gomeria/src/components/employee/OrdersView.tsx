@@ -39,15 +39,8 @@ export function OrdersView({ addToast, storeId }: Props) {
   }, []);
 
   useEffect(() => {
-    let active = true;
-    setLoading(true);
-    orderService.getAll()
-      .then((data) => { if (active) setOrders(data); })
-      .catch((e) => { if (active) addToast(e instanceof Error ? e.message : 'Error cargando pedidos.', 'error'); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    void refresh();
+  }, [refresh]);
 
   // Realtime: el portal cliente o cualquier otro TPV de la misma tienda
   // pueden insertar/actualizar pedidos. Mergeamos por id.
@@ -108,15 +101,15 @@ export function OrdersView({ addToast, storeId }: Props) {
   );
 
   return (
-    <div className="p-5 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-5">
+    <div className="p-4 lg:p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Pedidos</h1>
           <p className="text-sm flex items-center gap-2" style={{ color: 'var(--br-txt2)' }}>
-            {loading ? 'Cargando…' : `${activeCount} activos · ${orders.length} total`}
+            {loading ? 'Cargando…' : <><span className="tabular-nums">{activeCount}</span> activos · <span className="tabular-nums">{orders.length}</span> total</>}
             {storeId && (
               <span className="inline-flex items-center gap-1 text-xs" title="Recibiendo pedidos en vivo">
-                <Radio className="h-3 w-3 animate-pulse" style={{ color: 'var(--br-amb)' }} />
+                <Radio className="h-3 w-3 motion-safe:animate-pulse" style={{ color: 'var(--br-amb)' }} aria-hidden="true" />
                 <span style={{ color: 'var(--br-amb)' }}>en vivo</span>
               </span>
             )}

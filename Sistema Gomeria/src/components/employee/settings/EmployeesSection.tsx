@@ -11,6 +11,7 @@ import { roleService } from '@/services/roleService';
 import { storeService } from '@/services/storeService';
 import { hashPin } from '@/utils/hash';
 import { Modal } from '@/components/ui/Modal';
+import { IconButton } from '@/components/ui';
 import { UserPlus, Edit2, Users, Power, KeyRound } from 'lucide-react';
 
 interface Props {
@@ -229,23 +230,23 @@ export function EmployeesSection({ addToast }: Props) {
                         : emp.storeIds.map(storeName).join(', ')}
                   </p>
                 </div>
-                <div className="flex gap-1 flex-shrink-0">
-                  <button
+                <div className="flex gap-2 flex-shrink-0">
+                  <IconButton
+                    label={`Editar ${emp.name}`}
+                    icon={<Edit2 className="h-4 w-4" />}
+                    tone="neutral"
+                    size="sm"
+                    bordered={false}
                     onClick={() => openEdit(emp)}
-                    className="p-1.5 rounded"
-                    style={{ color: 'var(--br-txt2)' }}
-                    title="Editar"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </button>
-                  <button
+                  />
+                  <IconButton
+                    label={emp.active ? `Desactivar ${emp.name}` : `Activar ${emp.name}`}
+                    icon={<Power className="h-4 w-4" />}
+                    tone={emp.active ? 'danger' : 'success'}
+                    size="sm"
+                    bordered={false}
                     onClick={() => toggleActive(emp)}
-                    className="p-1.5 rounded"
-                    style={{ color: emp.active ? 'var(--br-red)' : 'var(--br-grn)' }}
-                    title={emp.active ? 'Desactivar' : 'Activar'}
-                  >
-                    <Power className="h-4 w-4" />
-                  </button>
+                  />
                 </div>
               </div>
             );
@@ -262,50 +263,54 @@ export function EmployeesSection({ addToast }: Props) {
       >
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Nombre *</label>
+            <label htmlFor="employee-name" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Nombre *</label>
             <input
+              id="employee-name"
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               autoFocus
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Email</label>
+              <label htmlFor="employee-email" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Email</label>
               <input
+                id="employee-email"
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 disabled={submitting}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Teléfono</label>
+              <label htmlFor="employee-phone" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Teléfono</label>
               <input
+                id="employee-phone"
                 type="tel"
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 disabled={submitting}
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Rol *</label>
+            <label htmlFor="employee-role" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Rol *</label>
             <select
+              id="employee-role"
               value={form.roleId}
               onChange={(e) => setForm({ ...form, roleId: e.target.value })}
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             >
               <option value="">Seleccionar rol...</option>
@@ -381,25 +386,31 @@ export function EmployeesSection({ addToast }: Props) {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <input
+                id="employee-pin"
                 type="password"
                 inputMode="numeric"
                 maxLength={8}
                 value={form.pin}
                 onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, '') })}
                 placeholder={editing ? 'Dejar vacío' : 'PIN (4-8 dígitos)'}
+                aria-label="PIN del empleado"
+                autoComplete="new-password"
                 disabled={submitting}
-                className="px-3 py-2 rounded-lg text-sm outline-none text-center tracking-widest"
+                className="px-3 py-2 rounded-lg text-sm outline-none text-center tracking-widest focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
               <input
+                id="employee-pin-confirm"
                 type="password"
                 inputMode="numeric"
                 maxLength={8}
                 value={form.pinConfirm}
                 onChange={(e) => setForm({ ...form, pinConfirm: e.target.value.replace(/\D/g, '') })}
                 placeholder="Confirmar PIN"
+                aria-label="Confirmar PIN del empleado"
+                autoComplete="new-password"
                 disabled={submitting}
-                className="px-3 py-2 rounded-lg text-sm outline-none text-center tracking-widest"
+                className="px-3 py-2 rounded-lg text-sm outline-none text-center tracking-widest focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
             </div>

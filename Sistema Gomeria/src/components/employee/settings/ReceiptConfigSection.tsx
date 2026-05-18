@@ -66,30 +66,32 @@ export function ReceiptConfigSection({ storeId, storeName, addToast }: Props) {
         ) : (
           <>
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
+              <label htmlFor="receipt-header" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
                 Encabezado del ticket
               </label>
               <textarea
+                id="receipt-header"
                 value={config.header ?? ''}
                 onChange={(e) => setConfig({ ...config, header: e.target.value })}
                 rows={3}
                 placeholder="Texto opcional arriba del ticket (ej: CUIT, condición frente al IVA, etc.)"
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
               <p className="text-xs mt-1" style={{ color: 'var(--br-txt2)' }}>{(config.header ?? '').length}/500</p>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
+              <label htmlFor="receipt-footer" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
                 Pie del ticket
               </label>
               <textarea
+                id="receipt-footer"
                 value={config.footer ?? ''}
                 onChange={(e) => setConfig({ ...config, footer: e.target.value })}
                 rows={3}
                 placeholder="¡Gracias por su compra!"
-                className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none"
+                className="w-full px-3 py-2 rounded-lg text-sm outline-none resize-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                 style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               />
               <p className="text-xs mt-1" style={{ color: 'var(--br-txt2)' }}>{(config.footer ?? '').length}/500</p>

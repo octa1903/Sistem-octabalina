@@ -153,13 +153,13 @@ export function InvoicesView({ addToast }: Props) {
   }
 
   return (
-    <div className="p-5 max-w-6xl mx-auto">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div className="p-4 lg:p-6 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Facturas</h1>
           <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
-            {invoices.filter((i) => !i.paid).length} impagas ·{' '}
-            <span className="font-semibold font-mono" style={{ color: 'var(--br-red)' }}>{formatCurrency(totalUnpaid)}</span>
+            <span className="tabular-nums">{invoices.filter((i) => !i.paid).length}</span> impagas ·{' '}
+            <span className="font-semibold font-mono tabular-nums" style={{ color: 'var(--br-red)' }}>{formatCurrency(totalUnpaid)}</span>
           </p>
         </div>
         <Button variant="primary" onClick={openNew} iconLeft={<Plus className="h-4 w-4" />}>
@@ -198,14 +198,20 @@ export function InvoicesView({ addToast }: Props) {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="px-4 py-10 text-center text-sm" style={{ color: 'var(--br-txt2)' }}>Cargando...</td></tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--br-bor)' }}>
+                    {Array.from({ length: 8 }).map((_, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="h-4 rounded motion-safe:animate-pulse" style={{ background: 'var(--br-sur2)' }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={8}><EmptyState icon={FileText} title="Sin facturas." density="compact" /></td></tr>
               ) : (
                 filtered.map((inv) => (
-                  <tr key={inv.id} style={{ borderBottom: '1px solid var(--br-bor)' }}
-                    onMouseOver={(e) => (e.currentTarget.style.background = 'var(--br-sur2)')}
-                    onMouseOut={(e) => (e.currentTarget.style.background = '')}>
+                  <tr key={inv.id} className="transition-colors hover:bg-[var(--br-sur2)]" style={{ borderBottom: '1px solid var(--br-bor)' }}>
                     <td className="px-4 py-3">
                       <span className="px-2 py-0.5 rounded text-xs font-bold" style={{ background: 'var(--br-sur2)', color: 'var(--br-txt)' }}>
                         Fac. {inv.type}
@@ -215,15 +221,20 @@ export function InvoicesView({ addToast }: Props) {
                     <td className="px-4 py-3 font-medium" style={{ color: 'var(--br-txt)' }}>{inv.supplier}</td>
                     <td className="px-4 py-3 text-xs" style={{ color: 'var(--br-txt2)' }}>{new Date(inv.date).toLocaleDateString('es-AR')}</td>
                     <td className="px-4 py-3 text-xs" style={{ color: 'var(--br-txt2)' }}>{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString('es-AR') : '—'}</td>
-                    <td className="px-4 py-3 font-mono font-semibold" style={{ color: 'var(--br-txt)' }}>{formatCurrency(inv.total)}</td>
+                    <td className="px-4 py-3 font-mono tabular-nums font-semibold" style={{ color: 'var(--br-txt)' }}>{formatCurrency(inv.total)}</td>
                     <td className="px-4 py-3">
-                      <button onClick={() => void togglePaid(inv)} className="flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full"
+                      <button
+                        type="button"
+                        onClick={() => void togglePaid(inv)}
+                        aria-label={inv.paid ? `Marcar factura ${inv.number} como impaga` : `Marcar factura ${inv.number} como pagada`}
+                        className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full transition-colors hover:opacity-80 focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-amb)]"
                         style={{
                           color: inv.paid ? 'var(--br-grn)' : 'var(--br-red)',
                           background: inv.paid ? 'var(--br-grn-bg)' : 'var(--br-red-bg)',
                           border: `1px solid ${inv.paid ? 'var(--br-grn-bor)' : 'var(--br-red-bor)'}`,
-                        }}>
-                        {inv.paid ? <CheckCircle className="h-3 w-3" /> : <XCircle className="h-3 w-3" />}
+                        }}
+                      >
+                        {inv.paid ? <CheckCircle className="h-3 w-3" aria-hidden="true" /> : <XCircle className="h-3 w-3" aria-hidden="true" />}
                         {inv.paid ? 'Pagada' : 'Impaga'}
                       </button>
                     </td>

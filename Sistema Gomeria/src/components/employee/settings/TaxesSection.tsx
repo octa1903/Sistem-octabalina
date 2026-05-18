@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Tax } from '@/types';
 import { taxService } from '@/services/taxService';
 import { Modal } from '@/components/ui/Modal';
-import { Button } from '@/components/ui';
+import { Button, IconButton } from '@/components/ui';
 import { Plus, Edit2, Trash2, Percent } from 'lucide-react';
 
 interface Props {
@@ -136,13 +136,9 @@ export function TaxesSection({ addToast }: Props) {
                   {t.applyToNewTires && ' · Aplicado por defecto a neumáticos nuevos'}
                 </p>
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => openEdit(t)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }}>
-                  <Edit2 className="h-4 w-4" />
-                </button>
-                <button onClick={() => setDeleting(t)} className="p-1.5 rounded" style={{ color: 'var(--br-txt2)' }}>
-                  <Trash2 className="h-4 w-4" />
-                </button>
+              <div className="flex gap-2">
+                <IconButton label={`Editar ${t.name}`} icon={<Edit2 className="h-4 w-4" />} tone="neutral" size="sm" bordered={false} onClick={() => openEdit(t)} />
+                <IconButton label={`Eliminar ${t.name}`} icon={<Trash2 className="h-4 w-4" />} tone="danger" size="sm" bordered={false} onClick={() => setDeleting(t)} />
               </div>
             </div>
           ))
@@ -153,21 +149,23 @@ export function TaxesSection({ addToast }: Props) {
       <Modal open={modalOpen} onClose={() => !submitting && setModalOpen(false)} title={editing ? 'Editar impuesto' : 'Nuevo impuesto'} size="sm">
         <div className="space-y-3">
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Nombre</label>
+            <label htmlFor="tax-name" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Nombre</label>
             <input
+              id="tax-name"
               type="text"
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               placeholder="IVA 21%"
               autoFocus
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Tasa (%)</label>
+            <label htmlFor="tax-rate" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Tasa (%)</label>
             <input
+              id="tax-rate"
               type="number"
               min={0}
               max={100}
@@ -175,17 +173,18 @@ export function TaxesSection({ addToast }: Props) {
               value={form.rate}
               onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })}
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             />
           </div>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Inclusión</label>
+            <label htmlFor="tax-inclusion" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Inclusión</label>
             <select
+              id="tax-inclusion"
               value={form.inclusion}
               onChange={(e) => setForm({ ...form, inclusion: e.target.value as 'included' | 'added' })}
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
             >
               <option value="included">Incluido en el precio (precio = neto + impuesto)</option>

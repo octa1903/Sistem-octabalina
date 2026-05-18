@@ -5,6 +5,7 @@ import { categoryService } from '@/services/categoryService';
 import { taxService } from '@/services/taxService';
 import { formatCurrency, calculateSalePrice } from '@/utils/currency';
 import { Modal } from '@/components/ui/Modal';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ImportModal } from '@/components/employee/import/ImportModal';
 import { Button, IconButton, FormField, Input, Select, EmptyState } from '@/components/ui';
 import { Plus, Search, Edit2, Trash2, AlertTriangle, Upload, TrendingUp, Package } from 'lucide-react';
@@ -64,6 +65,7 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
   });
   const [bulkPreview, setBulkPreview] = useState<{ tiresCount: number; overridesCount: number } | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!activeStoreId) return;
@@ -233,13 +235,13 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
   }
 
   return (
-    <div className="p-5 max-w-7xl mx-auto">
-      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div className="p-4 lg:p-6 max-w-7xl mx-auto">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Inventario</h1>
           <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>
-            {tires.length} neumáticos
-            {lowCount > 0 && <span style={{ color: 'var(--br-red)' }}> · {lowCount} con stock bajo</span>}
+            <span className="tabular-nums">{tires.length}</span> {tires.length === 1 ? 'neumático' : 'neumáticos'}
+            {lowCount > 0 && <span style={{ color: 'var(--br-red)' }}> · <span className="tabular-nums">{lowCount}</span> con stock bajo</span>}
           </p>
         </div>
         <div className="flex gap-2">
@@ -299,15 +301,18 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
           {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
         </Select>
         <button
+          type="button"
           onClick={() => setOnlyLow(!onlyLow)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors"
+          aria-pressed={onlyLow}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-amb)]"
           style={{
             border: `1px solid ${onlyLow ? 'var(--br-amb-bor)' : 'var(--br-bor)'}`,
             background: onlyLow ? 'var(--br-amb-bg)' : 'var(--br-sur)',
             color: onlyLow ? 'var(--br-amb)' : 'var(--br-txt2)',
           }}
         >
-          <AlertTriangle className="h-4 w-4" /> Solo alertas {lowCount > 0 && `(${lowCount})`}
+          <AlertTriangle className="h-4 w-4" aria-hidden="true" /> Solo alertas
+          {lowCount > 0 && <span className="tabular-nums">({lowCount})</span>}
         </button>
       </div>
 
@@ -324,7 +329,15 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={9} className="px-4 py-12 text-center text-sm" style={{ color: 'var(--br-txt2)' }}>Cargando...</td></tr>
+                Array.from({ length: 6 }).map((_, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--br-bor)' }}>
+                    {Array.from({ length: 9 }).map((_, j) => (
+                      <td key={j} className="px-4 py-3">
+                        <div className="h-4 rounded motion-safe:animate-pulse" style={{ background: 'var(--br-sur2)' }} />
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={9}>
                   <EmptyState
@@ -624,32 +637,12 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
               variant="primary"
               loading={bulkBusy}
               disabled={bulkBusy || !bulkPreview}
-              onClick={async () => {
+              onClick={() => {
                 if (!bulkPreview || (bulkPreview.tiresCount === 0 && bulkPreview.overridesCount === 0)) {
                   addToast('Calculá el impacto primero.', 'warning');
                   return;
                 }
-                if (!confirm(`Confirmá: ${bulkForm.pctDelta >= 0 ? '+' : ''}${bulkForm.pctDelta}% sobre los productos seleccionados.`)) return;
-                setBulkBusy(true);
-                try {
-                  const r = await tireServiceV2.bulkAdjustPrices({
-                    pctDelta: bulkForm.pctDelta,
-                    brand: bulkForm.brand || null,
-                    categoryId: bulkForm.categoryId || null,
-                    storeId: activeStoreId,
-                    touchCost: bulkForm.touchCost,
-                    touchDefaultPrice: bulkForm.touchDefaultPrice,
-                    touchOverrides: bulkForm.touchOverrides,
-                    dryRun: false,
-                  });
-                  addToast(`Ajustados ${r.tiresCount} producto(s) y ${r.overridesCount} precio(s) por tienda.`, 'success');
-                  setBulkOpen(false);
-                  await refresh();
-                } catch (e) {
-                  addToast(e instanceof Error ? e.message : 'Error aplicando ajuste.', 'error');
-                } finally {
-                  setBulkBusy(false);
-                }
+                setBulkConfirmOpen(true);
               }}
             >
               Aplicar
@@ -657,6 +650,38 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={bulkConfirmOpen}
+        onClose={() => setBulkConfirmOpen(false)}
+        type={bulkForm.pctDelta >= 0 ? 'warning' : 'danger'}
+        title="Confirmar ajuste masivo"
+        message={`Vas a ${bulkForm.pctDelta >= 0 ? 'aumentar' : 'reducir'} ${Math.abs(bulkForm.pctDelta)}% sobre ${bulkPreview?.tiresCount ?? 0} producto(s) y ${bulkPreview?.overridesCount ?? 0} precio(s) por tienda. Esta acción no se puede deshacer.`}
+        confirmText="Aplicar ajuste"
+        onConfirm={async () => {
+          setBulkConfirmOpen(false);
+          setBulkBusy(true);
+          try {
+            const r = await tireServiceV2.bulkAdjustPrices({
+              pctDelta: bulkForm.pctDelta,
+              brand: bulkForm.brand || null,
+              categoryId: bulkForm.categoryId || null,
+              storeId: activeStoreId,
+              touchCost: bulkForm.touchCost,
+              touchDefaultPrice: bulkForm.touchDefaultPrice,
+              touchOverrides: bulkForm.touchOverrides,
+              dryRun: false,
+            });
+            addToast(`Ajustados ${r.tiresCount} producto(s) y ${r.overridesCount} precio(s) por tienda.`, 'success');
+            setBulkOpen(false);
+            await refresh();
+          } catch (e) {
+            addToast(e instanceof Error ? e.message : 'Error aplicando ajuste.', 'error');
+          } finally {
+            setBulkBusy(false);
+          }
+        }}
+      />
 
       {/* Delete confirm */}
       <Modal open={!!deleting} onClose={() => setDeleting(null)} title="Confirmar eliminación" size="sm">

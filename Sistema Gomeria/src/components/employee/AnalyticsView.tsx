@@ -217,7 +217,7 @@ export function AnalyticsView({ storeId }: Props) {
   }
 
   return (
-    <div className="p-5 max-w-6xl mx-auto">
+    <div className="p-4 lg:p-6 max-w-6xl mx-auto">
       <div className="mb-4 flex items-center justify-between flex-wrap gap-3">
         <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Informes</h1>
         <div className="flex items-center gap-2">
@@ -226,7 +226,7 @@ export function AnalyticsView({ storeId }: Props) {
             size="sm"
             onClick={() => void refresh()}
             disabled={loading}
-            iconLeft={<RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />}
+            iconLeft={<RefreshCw className={`h-4 w-4 ${loading ? 'motion-safe:animate-spin' : ''}`} aria-hidden="true" />}
           >
             Recargar
           </Button>

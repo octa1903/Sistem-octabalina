@@ -19,14 +19,16 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { error, hint, iconLeft, iconRight, sizeVariant = 'md', className, id, ...rest },
   ref,
 ) {
+  const msgId = id && (error || hint) ? `${id}-msg` : undefined;
   const inputEl = (
     <input
       ref={ref}
       id={id}
       aria-invalid={error ? 'true' : undefined}
-      aria-describedby={error || hint ? `${id ?? ''}-msg` : undefined}
+      aria-describedby={msgId}
       className={cn(
-        'w-full rounded-lg px-3 transition-colors focus:outline-none',
+        'w-full rounded-lg px-3 transition-colors',
+        'focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]',
         sizeClasses[sizeVariant],
         iconLeft && 'pl-9',
         iconRight && 'pr-9',
@@ -68,8 +70,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       </div>
       {(error || hint) && (
         <p
-          id={`${id ?? ''}-msg`}
+          id={msgId}
           className="mt-1 text-xs"
+          role={error ? 'alert' : undefined}
           style={{ color: error ? 'var(--br-red)' : 'var(--br-txt2)' }}
         >
           {error ?? hint}

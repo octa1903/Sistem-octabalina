@@ -364,6 +364,18 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
     if (ticketDiscountWasCapped) {
       addToast(`Descuento truncado al ${operatorMaxDiscountPct}% (tope de tu rol).`, 'info');
     }
+    // Express: venta simple (efectivo, sin descuento, sin puntos, ≤3 ítems) salta el modal.
+    // PRODUCT.md §1: cada acción frecuente del POS en ≤2 taps. El operador ya leyó el panel.
+    const isExpress =
+      selectedPm?.type === 'cash' &&
+      !ticketDiscount &&
+      !pointsToRedeem &&
+      cart.length <= 3 &&
+      !isAccountPaymentMethod(selectedPm);
+    if (isExpress) {
+      void confirmSale();
+      return;
+    }
     setCheckoutOpen(true);
   }
 
@@ -621,13 +633,14 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         {/* Filters */}
         <div className="flex gap-2 mb-4 flex-wrap">
           <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--br-txt2)' }} />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--br-txt2)' }} aria-hidden="true" />
             <input
-              type="text"
+              type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar neumático..."
-              className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none"
+              aria-label="Buscar neumático por marca, modelo o medida"
+              className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }}
             />
           </div>
@@ -650,38 +663,42 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               {Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="rounded-xl p-3 animate-pulse"
+                  className="rounded-xl p-3 motion-safe:animate-pulse"
                   style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)', height: '116px' }}
                 />
               ))}
             </div>
           ) : (
             <div className="grid grid-cols-2 xl:grid-cols-3 gap-2">
-              {filtered.map((row) => (
-                <button
-                  key={row.tire.id}
-                  onClick={() => addToCart(row)}
-                  className="text-left rounded-xl p-3 transition-all"
-                  style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
-                  onMouseOver={(e) => (e.currentTarget.style.borderColor = 'var(--br-amb)')}
-                  onMouseOut={(e) => (e.currentTarget.style.borderColor = 'var(--br-bor)')}
-                >
-                  <p className="text-xs font-medium" style={{ color: 'var(--br-txt2)' }}>{row.tire.brand}</p>
-                  <p className="font-mono text-sm font-semibold" style={{ color: 'var(--br-txt)' }}>{row.tire.size}</p>
-                  <p className="text-xs" style={{ color: 'var(--br-txt2)' }}>{row.tire.model}</p>
-                  <div className="flex items-center justify-between mt-2">
-                    <span className="font-semibold text-sm" style={{ color: 'var(--br-amb)' }}>
-                      {formatCurrency(row.price)}
-                    </span>
-                    <span className="text-xs px-1.5 py-0.5 rounded-full" style={{
-                      color: row.stock <= row.minStock ? 'var(--br-red)' : 'var(--br-grn)',
-                      background: row.stock <= row.minStock ? 'var(--br-red-bg)' : 'var(--br-grn-bg)',
-                    }}>
-                      {row.stock} u.
-                    </span>
-                  </div>
-                </button>
-              ))}
+              {filtered.map((row) => {
+                const low = row.stock <= row.minStock;
+                return (
+                  <button
+                    key={row.tire.id}
+                    onClick={() => addToCart(row)}
+                    aria-label={`Agregar ${row.tire.brand} ${row.tire.size} ${formatCurrency(row.price)}, ${row.stock} en stock`}
+                    className="group text-left rounded-xl p-3 transition-colors duration-150 border border-[var(--br-bor)] bg-[var(--br-sur)] hover:border-[var(--br-amb)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-amb)] active:bg-[var(--br-sur2)] motion-safe:active:scale-[0.98] transition-transform"
+                  >
+                    <p className="text-xs font-medium" style={{ color: 'var(--br-txt2)' }}>{row.tire.brand}</p>
+                    <p className="font-mono text-sm font-semibold" style={{ color: 'var(--br-txt)' }}>{row.tire.size}</p>
+                    <p className="text-xs truncate" style={{ color: 'var(--br-txt2)' }}>{row.tire.model}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      <span className="font-semibold text-sm" style={{ color: 'var(--br-amb)' }}>
+                        {formatCurrency(row.price)}
+                      </span>
+                      <span
+                        className="text-xs px-1.5 py-0.5 rounded-full"
+                        style={{
+                          color: low ? 'var(--br-red)' : 'var(--br-grn)',
+                          background: low ? 'var(--br-red-bg)' : 'var(--br-grn-bg)',
+                        }}
+                      >
+                        {row.stock} u.
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
               {!loading && filtered.length === 0 && (
                 <p className="col-span-3 text-sm py-10 text-center" style={{ color: 'var(--br-txt2)' }}>
                   {tires.length === 0 ? 'No hay neumáticos en esta tienda.' : 'Sin resultados.'}
@@ -703,9 +720,9 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
             <button
               type="button"
               onClick={() => setClearCartConfirm(true)}
-              className="text-xs font-medium px-2 py-1 rounded hover:opacity-80"
+              className="text-xs font-medium px-2 py-1 rounded transition-colors hover:bg-[var(--br-red-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-red)]"
               style={{ color: 'var(--br-red)' }}
-              title="Vaciar carrito"
+              aria-label={`Vaciar carrito (${cart.length} ${cart.length === 1 ? 'ítem' : 'ítems'})`}
             >
               Vaciar
             </button>
@@ -713,10 +730,13 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         </div>
 
         {!cashSession && (
-          <div className="mx-3 mt-3 p-3 rounded-lg flex items-start gap-2"
-               style={{ background: 'var(--br-red-bg)', border: '1px solid var(--br-red-bor)', color: 'var(--br-red)' }}>
-            <Lock className="h-4 w-4 mt-0.5 flex-shrink-0" />
-            <span className="text-xs">Abrí la caja para vender. Botón "Abrir caja" arriba.</span>
+          <div
+            role="status"
+            className="mx-3 mt-3 p-3 rounded-lg flex items-start gap-2"
+            style={{ background: 'var(--br-warn-bg)', border: '1px solid var(--br-warn-bor)', color: 'var(--br-warn)' }}
+          >
+            <Lock className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
+            <span className="text-xs">Caja cerrada. Tocá «Abrir caja» arriba para empezar a vender.</span>
           </div>
         )}
 
@@ -728,27 +748,27 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               <div key={ci.tire.id} className="rounded-lg p-3" style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)' }}>
                 <p className="text-xs font-medium" style={{ color: 'var(--br-txt)' }}>{ci.tire.brand} {ci.tire.model}</p>
                 <p className="text-xs font-mono" style={{ color: 'var(--br-txt2)' }}>{ci.tire.size}</p>
-                {/* Targets táctiles 44px (mín. para guantes/manos sucias). */}
+                {/* Targets táctiles 48px + gap-2 (PRODUCT.md §1, separación destructivo). */}
                 <div className="flex items-center justify-between mt-2 gap-2">
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => updateQty(ci.tire.id, -1)}
                       aria-label={`Restar ${ci.tire.brand} ${ci.tire.size}`}
-                      className="w-11 h-11 rounded flex items-center justify-center active:opacity-70"
+                      className="w-12 h-12 rounded flex items-center justify-center transition-colors hover:bg-[var(--br-sur2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-amb)] active:bg-[var(--br-bor)]"
                       style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
                     >
-                      <Minus className="h-4 w-4" />
+                      <Minus className="h-4 w-4" aria-hidden="true" />
                     </button>
-                    <span className="w-8 text-center text-sm font-semibold tabular-nums">{ci.quantity}</span>
+                    <span className="w-8 text-center text-sm font-semibold tabular-nums" aria-live="polite" aria-atomic="true">{ci.quantity}</span>
                     <button
                       type="button"
                       onClick={() => updateQty(ci.tire.id, 1)}
                       aria-label={`Sumar ${ci.tire.brand} ${ci.tire.size}`}
-                      className="w-11 h-11 rounded flex items-center justify-center active:opacity-70"
+                      className="w-12 h-12 rounded flex items-center justify-center transition-colors hover:bg-[var(--br-sur2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-amb)] active:bg-[var(--br-bor)]"
                       style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-4 w-4" aria-hidden="true" />
                     </button>
                   </div>
                   <span className="text-sm font-semibold font-mono" style={{ color: 'var(--br-amb)' }}>{formatCurrency(ci.subtotal)}</span>
@@ -756,10 +776,10 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
                     type="button"
                     onClick={() => setCart((p) => p.filter((i) => i.tire.id !== ci.tire.id))}
                     aria-label={`Quitar ${ci.tire.brand} ${ci.tire.size} del carrito`}
-                    className="w-11 h-11 rounded flex items-center justify-center active:opacity-70"
+                    className="w-12 h-12 ml-2 rounded flex items-center justify-center transition-colors hover:bg-[var(--br-red-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-red)]"
                     style={{ color: 'var(--br-red)' }}
                   >
-                    <Trash2 className="h-5 w-5" />
+                    <Trash2 className="h-5 w-5" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -770,10 +790,11 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         {/* Cart footer */}
         <div className="p-4 space-y-3" style={{ borderTop: '1px solid var(--br-bor)' }}>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
+            <label htmlFor="pos-customer" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
               Cliente {isAccountPaymentMethod(selectedPm) ? '(requerido por Cuenta Corriente)' : '(opcional)'}
             </label>
             <Select
+              id="pos-customer"
               value={customerId}
               onChange={(e) => setCustomerId(e.target.value)}
             >
@@ -787,10 +808,11 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
             )}
             {loyalty.enabled && selectedCustomer && customerPointsBalance > 0 && (
               <div className="mt-2">
-                <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
+                <label htmlFor="pos-points-redeem" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
                   Canjear puntos · saldo {customerPointsBalance.toFixed(0)} pts
                 </label>
                 <input
+                  id="pos-points-redeem"
                   type="number"
                   min={0}
                   max={Math.min(customerPointsBalance, subtotalAfterDiscount)}
@@ -798,7 +820,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
                   value={pointsToRedeem}
                   onChange={(e) => setPointsToRedeem(e.target.value)}
                   placeholder="0"
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                  className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                   style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
                 />
                 {requestedPoints > pointsRedeemed && (
@@ -811,10 +833,11 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
           </div>
 
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
+            <label htmlFor="pos-payment-method" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
               Método de pago
             </label>
             <Select
+              id="pos-payment-method"
               value={paymentMethodId}
               onChange={(e) => setPaymentMethodId(e.target.value)}
             >
@@ -828,10 +851,11 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
 
           {canDiscount && discounts.length > 0 && (
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide mb-1 flex items-center gap-1" style={{ color: 'var(--br-txt2)' }}>
-                <Tag className="h-3 w-3" /> Descuento
+              <label htmlFor="pos-discount" className="block text-xs font-semibold uppercase tracking-wide mb-1 flex items-center gap-1" style={{ color: 'var(--br-txt2)' }}>
+                <Tag className="h-3 w-3" aria-hidden="true" /> Descuento
               </label>
               <Select
+                id="pos-discount"
                 value={ticketDiscountId}
                 onChange={(e) => { setTicketDiscountId(e.target.value); setPendingDiscountValue(''); }}
               >
@@ -851,9 +875,10 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
                   value={pendingDiscountValue}
                   onChange={(e) => setPendingDiscountValue(e.target.value)}
                   placeholder={ticketDiscount.type === 'percent' ? '% (ej: 10)' : 'Monto $ (ej: 500)'}
+                  aria-label={ticketDiscount.type === 'percent' ? 'Porcentaje de descuento' : 'Monto de descuento'}
                   min="0"
                   step="0.01"
-                  className="w-full mt-2 px-3 py-2 rounded-lg text-sm outline-none"
+                  className="w-full mt-2 px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
                   style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
                 />
               )}
@@ -907,9 +932,11 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
             fullWidth
             onClick={checkout}
             disabled={!canCheckout}
-            title={!cashSession ? 'Abrí la caja primero' : ''}
+            title={!cashSession ? 'Abrí la caja primero' : undefined}
+            className="font-mono tabular-nums"
           >
-            Cobrar {formatCurrency(total)}
+            <span className="font-semibold not-italic" style={{ fontFamily: 'inherit' }}>Cobrar</span>
+            <span className="ml-1">{formatCurrency(total)}</span>
           </Button>
 
           <div className="grid grid-cols-2 gap-2">
@@ -935,8 +962,9 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               Tickets abiertos
               {parkedTickets.length > 0 && (
                 <span
-                  className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold"
-                  style={{ background: 'var(--br-amb)', color: 'white' }}
+                  aria-label={`${parkedTickets.length} ticket(s) abierto(s)`}
+                  className="ml-1.5 px-1.5 min-w-[18px] inline-flex items-center justify-center rounded-full text-[10px] font-bold tabular-nums"
+                  style={{ background: 'var(--br-amb)', color: 'var(--br-bg)' }}
                 >
                   {parkedTickets.length}
                 </span>
@@ -954,29 +982,51 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
 
       {/* Checkout modal */}
       <Modal open={checkoutOpen} onClose={() => !confirming && setCheckoutOpen(false)} title="Confirmar venta" size="sm">
-        <div className="space-y-3">
-          {cart.map((ci) => (
-            <div key={ci.tire.id} className="flex justify-between text-sm" style={{ color: 'var(--br-txt)' }}>
-              <span>{ci.tire.brand} {ci.tire.size} × {ci.quantity}</span>
-              <span className="font-mono">{formatCurrency(ci.subtotal)}</span>
-            </div>
-          ))}
-          <div className="pt-2" style={{ borderTop: '1px solid var(--br-bor)' }}>
-            <div className="flex justify-between font-semibold">
-              <span>Total ({selectedPm?.name})</span>
-              <span className="font-mono" style={{ color: 'var(--br-amb)' }}>{formatCurrency(total)}</span>
-            </div>
+        {/* Total como hero: lo primero que el operador lee. */}
+        <div className="-mx-5 -mt-2 px-5 py-4 mb-4" style={{ background: 'var(--br-sur2)', borderBottom: '1px solid var(--br-bor)' }}>
+          <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--br-txt2)' }}>
+            Total a cobrar
+          </p>
+          <p className="text-3xl font-bold font-mono tabular-nums mt-0.5" style={{ color: 'var(--br-amb)' }}>
+            {formatCurrency(total)}
+          </p>
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-xs mt-1.5" style={{ color: 'var(--br-txt2)' }}>
+            <span>{selectedPm?.name}</span>
             {selectedCustomer && (
-              <p className="text-xs mt-1" style={{ color: 'var(--br-txt2)' }}>Cliente: {selectedCustomer.name}</p>
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{selectedCustomer.name}</span>
+              </>
+            )}
+            {ticketDiscount && (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>con descuento</span>
+              </>
             )}
           </div>
         </div>
+
+        {/* Items compactos: 4+ ítems se condensan en scroll. */}
+        <ul className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+          {cart.map((ci) => (
+            <li key={ci.tire.id} className="flex justify-between gap-3 text-sm" style={{ color: 'var(--br-txt)' }}>
+              <span className="truncate">
+                <span style={{ color: 'var(--br-txt2)' }}>{ci.quantity}×</span> {ci.tire.brand} {ci.tire.size}
+              </span>
+              <span className="font-mono tabular-nums flex-shrink-0" style={{ color: 'var(--br-txt2)' }}>
+                {formatCurrency(ci.subtotal)}
+              </span>
+            </li>
+          ))}
+        </ul>
+
         <div className="flex justify-end gap-2 mt-5">
           <Button variant="secondary" onClick={() => setCheckoutOpen(false)} disabled={confirming}>
             Cancelar
           </Button>
-          <Button variant="success" onClick={confirmSale} loading={confirming}>
-            Confirmar venta
+          <Button variant="success" size="lg" onClick={confirmSale} loading={confirming}>
+            Cobrar {formatCurrency(total)}
           </Button>
         </div>
       </Modal>
@@ -1031,17 +1081,18 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
             El ticket queda en espera. No descuenta stock ni registra pagos hasta que lo reanudes y cobres.
           </p>
           <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
+            <label htmlFor="pos-park-name" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
               Nombre / Referencia
             </label>
             <input
+              id="pos-park-name"
               type="text"
               value={parkName}
               onChange={(e) => setParkName(e.target.value)}
               placeholder="Ej: Camioneta blanca, Juan Pérez..."
               autoFocus
               maxLength={60}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
               style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               onKeyDown={(e) => { if (e.key === 'Enter') void confirmPark(); }}
             />

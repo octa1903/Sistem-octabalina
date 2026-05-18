@@ -67,7 +67,7 @@ export function ConfirmDialog({
           className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full"
           style={{ background: palette.bg, color: palette.fg }}
         >
-          <Icon className="h-7 w-7" />
+          <Icon className="h-7 w-7" aria-hidden="true" />
         </div>
         <h3 className="mb-2 text-lg font-semibold" style={{ color: 'var(--br-txt)' }}>
           {title}
@@ -89,7 +89,7 @@ export function ConfirmDialog({
             }}
             placeholder={inputPlaceholder}
             aria-label={inputPlaceholder ?? title}
-            className="mb-4 w-full rounded-lg px-3 py-2 text-sm focus:outline-none"
+            className="mb-4 w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
             style={{
               border: '1px solid var(--br-bor)',
               background: 'var(--br-sur)',
@@ -101,8 +101,9 @@ export function ConfirmDialog({
 
         <div className="flex gap-3">
           <button
+            type="button"
             onClick={onClose}
-            className="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--br-sur2)]"
+            className="flex-1 rounded-lg px-4 py-2 text-sm font-medium transition-colors hover:bg-[var(--br-sur2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--br-amb)] focus-visible:ring-offset-[var(--br-sur)]"
             style={{
               border: '1px solid var(--br-bor)',
               color: 'var(--br-txt)',
@@ -112,8 +113,9 @@ export function ConfirmDialog({
             {cancelText}
           </button>
           <button
+            type="button"
             onClick={() => onConfirm(inputField ? inputValue : undefined)}
-            className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+            className="flex-1 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--br-amb)] focus-visible:ring-offset-[var(--br-sur)]"
             style={{ background: palette.fg }}
             autoFocus={!inputField}
           >

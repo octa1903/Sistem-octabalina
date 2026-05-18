@@ -364,14 +364,14 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
             <Input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
           </FormField>
           {pwdError && (
-            <p className="text-sm px-3 py-2 rounded-lg" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)' }}>
+            <p role="alert" className="text-sm px-3 py-2 rounded-lg" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}>
               {pwdError}
             </p>
           )}
         </div>
         <div className="flex justify-end gap-2 mt-6">
           <Button variant="secondary" onClick={() => setPwdOpen(false)}>Cancelar</Button>
-          <Button variant="secondary" style={{ background: 'var(--br-dark)', color: '#fff', borderColor: 'var(--br-dark)' }} onClick={() => { void changePassword(); }}>
+          <Button variant="primary" onClick={() => { void changePassword(); }}>
             Actualizar contraseña
           </Button>
         </div>

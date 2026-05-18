@@ -24,7 +24,8 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
         id={id}
         aria-invalid={error ? 'true' : undefined}
         className={cn(
-          'w-full appearance-none rounded-lg pl-3 transition-colors focus:outline-none',
+          'w-full appearance-none rounded-lg pl-3 transition-colors',
+          'focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]',
           sizeClasses[sizeVariant],
           className,
         )}
