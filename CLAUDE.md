@@ -5,7 +5,7 @@ POS multi-tienda para gomería en Mar del Plata. Migrando de localStorage → Su
 ## Stack
 React 19 · TypeScript 5.9 · Vite 7 · Tailwind 4 · Supabase (Postgres + Auth + RLS + Realtime) · Vitest · Dexie (offline-first futuro).
 
-App vive en `Sistema Gomeria/` (subcarpeta — no ejecutes npm en la raíz del repo).
+App vive en `Sistema Gomeria/` (subcarpeta — no ejecutes npm en la raíz del repo). Docs en `docs/` (DESIGN, PRODUCT, REPO-LAYOUT). Material legacy (binarios Firebird, parser .gdb, backups viejos, identidad empresa) vive **fuera del repo** en `~/octab-tools/` — ver `docs/REPO-LAYOUT.md`.
 
 ## Comandos
 ```

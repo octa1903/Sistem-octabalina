@@ -7,3 +7,19 @@
 # OS
 .DS_Store
 Thumbs.db
+
+# Legacy Firebird tooling (binarios pesados, no entran al repo)
+# Reubicados en ~/octab-tools/ — ver docs/REPO-LAYOUT.md
+tools/
+gdb-analysis/
+
+# Residuos históricos en raíz (single-file build viejo, backups)
+/index.html
+balina-backup-*.json
+sf_listing.md
+
+# Assets de identidad/diseño empresa (viven fuera del repo)
+diseno-empresa/
+
+# Pack para Codex AI assistant
+codex-capabilities/
