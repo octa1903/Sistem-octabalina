@@ -8,18 +8,14 @@
 .DS_Store
 Thumbs.db
 
-# Legacy Firebird tooling (binarios pesados, no entran al repo)
-# Reubicados en ~/octab-tools/ — ver docs/REPO-LAYOUT.md
+# Salvaguarda: estas carpetas viven en ~/octab-tools/ (ver docs/REPO-LAYOUT.md).
+# Si vuelven a aparecer en la raíz, no las trackeamos.
 tools/
 gdb-analysis/
+diseno-empresa/
+codex-capabilities/
 
-# Residuos históricos en raíz (single-file build viejo, backups)
+# Salvaguarda: residuos históricos que no deben volver al repo.
 /index.html
 balina-backup-*.json
 sf_listing.md
-
-# Assets de identidad/diseño empresa (viven fuera del repo)
-diseno-empresa/
-
-# Pack para Codex AI assistant
-codex-capabilities/
