@@ -19,6 +19,85 @@ export const customerServiceV2 = {
     return ensureNoError(data, error, 'customerServiceV2.getAll').map(r => rowToCamel<Customer>(r));
   },
 
+  /**
+   * Lista clientes con saldo distinto de cero (deudores + a favor).
+   * `sign`: 'debt' = balance > 0 (deudores), 'credit' = balance < 0 (a favor),
+   * undefined = ambos. Evita traer los 5175 clientes cuando solo importan
+   * los ~897 con movimiento real.
+   */
+  async getWithBalance(
+    opts: { sign?: 'debt' | 'credit'; search?: string; limit?: number } = {},
+  ): Promise<Customer[]> {
+    const { sign, search, limit = 500 } = opts;
+    let q = supabase.from(TABLE).select('*').is('deleted_at', null);
+    if (sign === 'debt') q = q.gt('account_balance', 0);
+    else if (sign === 'credit') q = q.lt('account_balance', 0);
+    else q = q.neq('account_balance', 0);
+    if (search && search.trim().length > 0) {
+      const term = search.trim().replace(/[%,]/g, ' ');
+      q = q.or(`name.ilike.%${term}%,phone.ilike.%${term}%`);
+    }
+    const { data, error } = await q
+      .order('account_balance', { ascending: sign === 'credit' })
+      .limit(limit);
+    return ensureNoError(data, error, 'customerServiceV2.getWithBalance').map(r =>
+      rowToCamel<Customer>(r),
+    );
+  },
+
+  /**
+   * Busca clientes por nombre o teléfono (server-side).
+   * Útil cuando hay miles de clientes y la búsqueda local no escala.
+   */
+  async search(term: string, limit = 100): Promise<Customer[]> {
+    const t = term.trim();
+    if (!t) return [];
+    const safe = t.replace(/[%,]/g, ' ');
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('*')
+      .is('deleted_at', null)
+      .or(`name.ilike.%${safe}%,phone.ilike.%${safe}%`)
+      .order('name', { ascending: true })
+      .limit(limit);
+    return ensureNoError(data, error, 'customerServiceV2.search').map(r =>
+      rowToCamel<Customer>(r),
+    );
+  },
+
+  /**
+   * Totales agregados de cuenta corriente (deuda total, saldo a favor, conteos).
+   * Más barato que traer N filas: usa head:true + count.
+   */
+  async getBalanceSummary(): Promise<{
+    totalDebt: number;
+    totalCredit: number;
+    debtorCount: number;
+    creditorCount: number;
+  }> {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('account_balance')
+      .is('deleted_at', null)
+      .neq('account_balance', 0);
+    const rows = ensureNoError(data, error, 'customerServiceV2.getBalanceSummary');
+    let totalDebt = 0;
+    let totalCredit = 0;
+    let debtorCount = 0;
+    let creditorCount = 0;
+    for (const r of rows as { account_balance: number }[]) {
+      const b = Number(r.account_balance);
+      if (b > 0) {
+        totalDebt += b;
+        debtorCount += 1;
+      } else if (b < 0) {
+        totalCredit += -b;
+        creditorCount += 1;
+      }
+    }
+    return { totalDebt, totalCredit, debtorCount, creditorCount };
+  },
+
   /** Incluye también los soft-deleted (uso admin/reportes históricos). */
   async getAllIncludingDeleted(): Promise<Customer[]> {
     const { data, error } = await supabase
