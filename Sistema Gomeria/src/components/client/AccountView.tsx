@@ -93,7 +93,18 @@ export function AccountView({ clientToken }: Props) {
         {/* Balance */}
         <div className="rounded-xl p-5" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
           <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--br-txt2)' }}>Cuenta corriente</p>
-          <p className="text-3xl font-bold font-mono" style={{ color: balance > 0 ? 'var(--br-red)' : balance < 0 ? 'var(--br-grn)' : 'var(--br-txt)' }}>
+          <p
+            className="text-3xl font-bold font-mono"
+            style={{ color: balance > 0 ? 'var(--br-red)' : balance < 0 ? 'var(--br-grn)' : 'var(--br-txt)' }}
+            aria-label={
+              balance > 0
+                ? `Debe ${formatCurrency(Math.abs(balance))}`
+                : balance < 0
+                  ? `A favor ${formatCurrency(Math.abs(balance))}`
+                  : `Sin saldo`
+            }
+          >
+            {balance > 0 ? 'Debe ' : balance < 0 ? 'A favor ' : ''}
             {formatCurrency(Math.abs(balance))}
           </p>
           <p className="text-sm mt-1" style={{ color: 'var(--br-txt2)' }}>

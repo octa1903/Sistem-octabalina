@@ -14,10 +14,15 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   fullWidth?: boolean;
 }
 
+// Tamaños calibrados para uso táctil (TPV con guantes / manos sucias):
+//   md = 48px (default; cumple WCAG/Loyverse mínimo 44px). NO bajar.
+//   sm = 40px (solo permitido en tablas admin/settings, NO en flujos POS).
+//   lg = 56px (acciones primarias críticas: cobrar, confirmar venta).
+// Antes md=40 y sm=32 — se subió en Fase D del plan de mejoras (2026-05).
 const sizeClasses: Record<Size, string> = {
-  sm: 'h-8 px-3 text-xs gap-1.5',
-  md: 'h-10 px-4 text-sm gap-2',
-  lg: 'h-12 px-6 text-base gap-2',
+  sm: 'h-10 px-3 text-xs gap-1.5',
+  md: 'h-12 px-4 text-sm gap-2',
+  lg: 'h-14 px-6 text-base gap-2',
 };
 
 const variantStyles: Record<Variant, { className: string; style?: React.CSSProperties }> = {
