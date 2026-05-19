@@ -18,10 +18,13 @@ import { supabase } from '@/services/supabaseClient';
 import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
 import { printReceipt } from '@/utils/printReceipt';
+import { buildLine } from '@/utils/buildLine';
+import { rollupTaxes } from '@/utils/rollupTaxes';
+import { CartPanel } from './pos/CartPanel';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Button, Select } from '@/components/ui';
-import { Search, Plus, Minus, Trash2, ShoppingCart, CheckCircle, Lock, Printer, Bookmark, Inbox, Tag } from 'lucide-react';
+import { Search, Trash2, CheckCircle, Printer } from 'lucide-react';
 
 interface Props {
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
@@ -217,80 +220,54 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
 
   const selectedPm = paymentMethods.find(p => p.id === paymentMethodId);
   const selectedCustomer = customers.find(c => c.id === customerId);
-  const subtotal = cart.reduce((s, i) => s + i.subtotal, 0);
-
-  // Descuento de ticket. Si tiene `value` definido se aplica directo; si es
-  // null el cajero ingresa el monto/porcentaje en un modal antes de cobrar.
   const ticketDiscount = discounts.find(d => d.id === ticketDiscountId) ?? null;
-  const ticketDiscountAmount = (() => {
-    if (!ticketDiscount) return 0;
-    const v = ticketDiscount.value ?? Number(pendingDiscountValue);
-    if (!Number.isFinite(v) || v <= 0) return 0;
-    const raw = ticketDiscount.type === 'percent'
-      ? Math.min(subtotal, subtotal * (v / 100))
-      : Math.min(subtotal, v);
-    // Tope del rol: el monto resultante no puede exceder operatorMaxDiscountPct%
-    // del subtotal. Si el descuento configurado excede, se trunca al cap.
-    if (subtotal > 0 && operatorMaxDiscountPct < 100) {
-      const cap = subtotal * (operatorMaxDiscountPct / 100);
-      return Math.min(raw, cap);
-    }
-    return raw;
-  })();
-  // Detección de truncado: ticket se intentó aplicar descuento mayor al tope.
-  const ticketDiscountWasCapped = (() => {
-    if (!ticketDiscount || subtotal <= 0) return false;
-    const v = ticketDiscount.value ?? Number(pendingDiscountValue);
-    if (!Number.isFinite(v) || v <= 0) return false;
-    const raw = ticketDiscount.type === 'percent'
-      ? Math.min(subtotal, subtotal * (v / 100))
-      : Math.min(subtotal, v);
-    return operatorMaxDiscountPct < 100 && raw > ticketDiscountAmount + 0.005;
-  })();
-  const subtotalAfterDiscount = Math.max(0, subtotal - ticketDiscountAmount);
-
-  // Canje de puntos: 1 punto = $1. Cap por saldo del cliente y por subtotal
-  // post-descuento (no permitir total negativo).
-  const customerPointsBalance = Number(selectedCustomer?.pointsBalance ?? 0);
-  const requestedPoints = Math.max(0, Math.floor(Number(pointsToRedeem) || 0));
-  const pointsRedeemed = loyalty.enabled && selectedCustomer
-    ? Math.min(requestedPoints, customerPointsBalance, subtotalAfterDiscount)
-    : 0;
-  const subtotalAfterRedeem = Math.max(0, subtotalAfterDiscount - pointsRedeemed);
-
   const surchargeRate = (selectedPm?.surchargePercent ?? 0) / 100;
-  // Gross-up: total = base / (1 - rate). Para rate=0 → total=base.
-  const total = surchargeRate > 0 && surchargeRate < 1
-    ? subtotalAfterRedeem / (1 - surchargeRate)
-    : subtotalAfterRedeem;
-  const surchargeAmount = total - subtotalAfterRedeem;
 
-  // Desglose de IVA: para cada item del carrito, sumar impuestos contenidos
-  // (price ya los incluye) y agregados (suman al total).
+  // Cálculo de líneas + totales delegado a utils/buildLine + utils/rollupTaxes.
+  // Ver tests en utils/__tests__/{buildLine,rollupTaxes}.test.ts.
   const taxesById = useMemo(() => new Map(taxes.map(t => [t.id, t])), [taxes]);
-  const taxBreakdown = useMemo(() => {
-    const included: Record<string, { name: string; amount: number }> = {};
-    const added: Record<string, { name: string; amount: number }> = {};
-    for (const ci of cart) {
-      const tireTaxIds = ci.tire.taxIds ?? [];
-      const net = ci.subtotal;
-      for (const tid of tireTaxIds) {
-        const tax = taxesById.get(tid);
-        if (!tax) continue;
-        if (tax.storeIds && !tax.storeIds.includes(storeId)) continue;
-        const amount = tax.inclusion === 'included'
-          ? net - net / (1 + tax.rate / 100)
-          : net * (tax.rate / 100);
-        const bucket = tax.inclusion === 'included' ? included : added;
-        if (!bucket[tid]) bucket[tid] = { name: tax.name, amount: 0 };
-        bucket[tid].amount += amount;
-      }
-    }
-    return {
-      included: Object.values(included),
-      added: Object.values(added),
-    };
-  }, [cart, taxesById, storeId]);
+  const cartLines = useMemo(
+    () => cart.map(ci => {
+      const lineTaxes = (ci.tire.taxIds ?? [])
+        .map(tid => taxesById.get(tid))
+        .filter((t): t is Tax => Boolean(t))
+        .filter(t => !t.storeIds || t.storeIds.includes(storeId));
+      return buildLine({
+        unitPrice: ci.unitPrice,
+        quantity: ci.quantity,
+        taxes: lineTaxes,
+      });
+    }),
+    [cart, taxesById, storeId],
+  );
+
+  const rollup = useMemo(() => {
+    const dv = ticketDiscount?.value ?? Number(pendingDiscountValue);
+    const tDiscount = ticketDiscount && Number.isFinite(dv) && dv > 0
+      ? { type: ticketDiscount.type, value: dv }
+      : null;
+    return rollupTaxes({
+      lines: cartLines,
+      ticketDiscount: tDiscount,
+      operatorMaxDiscountPct,
+      pointsToRedeem: loyalty.enabled && selectedCustomer ? Math.floor(Number(pointsToRedeem) || 0) : 0,
+      customerPointsBalance: Number(selectedCustomer?.pointsBalance ?? 0),
+      surchargeRate,
+    });
+  }, [cartLines, ticketDiscount, pendingDiscountValue, operatorMaxDiscountPct, loyalty.enabled, selectedCustomer, pointsToRedeem, surchargeRate]);
+
+  const subtotal = rollup.subtotal;
+  const ticketDiscountAmount = rollup.ticketDiscountAmount;
+  const ticketDiscountWasCapped = rollup.ticketDiscountWasCapped;
+  const pointsRedeemed = rollup.pointsRedeemed;
+  const total = rollup.total;
+  const surchargeAmount = rollup.surchargeAmount;
+  const taxBreakdown = { included: rollup.taxesIncluded, added: rollup.taxesAdded };
+
+  // Derivados para UI de canje de puntos (input limita por subtotal post-descuento).
+  const customerPointsBalance = Number(selectedCustomer?.pointsBalance ?? 0);
+  const subtotalAfterDiscount = Math.max(0, subtotal - ticketDiscountAmount);
+  const requestedPoints = Math.max(0, Math.floor(Number(pointsToRedeem) || 0));
 
   function addToCart(row: typeof tireRows[number]) {
     setCart(prev => {
@@ -710,279 +687,48 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         </div>
       </div>
 
-      {/* Cart panel */}
-      <div className="w-80 flex flex-col" style={{ background: 'var(--br-sur)', borderLeft: '1px solid var(--br-bor)' }}>
-        <div className="px-4 py-4 flex items-center justify-between gap-2" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-          <div className="flex items-center gap-2 min-w-0">
-            <ShoppingCart className="h-5 w-5 flex-shrink-0" style={{ color: 'var(--br-amb)' }} />
-            <span className="font-semibold text-sm" style={{ color: 'var(--br-txt)' }}>Carrito ({cart.length})</span>
-          </div>
-          {cart.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setClearCartConfirm(true)}
-              className="text-xs font-medium px-2 py-1 rounded transition-colors hover:bg-[var(--br-red-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-red)]"
-              style={{ color: 'var(--br-red)' }}
-              aria-label={`Vaciar carrito (${cart.length} ${cart.length === 1 ? 'ítem' : 'ítems'})`}
-            >
-              Vaciar
-            </button>
-          )}
-        </div>
-
-        {!cashSession && (
-          <div
-            role="status"
-            className="mx-3 mt-3 p-3 rounded-lg flex items-start gap-2"
-            style={{ background: 'var(--br-warn-bg)', border: '1px solid var(--br-warn-bor)', color: 'var(--br-warn)' }}
-          >
-            <Lock className="h-4 w-4 mt-0.5 flex-shrink-0" aria-hidden="true" />
-            <span className="text-xs">Caja cerrada. Tocá «Abrir caja» arriba para empezar a vender.</span>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto p-3 space-y-2">
-          {cart.length === 0 ? (
-            <p className="text-sm text-center py-8" style={{ color: 'var(--br-txt2)' }}>Seleccioná neumáticos.</p>
-          ) : (
-            cart.map((ci) => (
-              <div key={ci.tire.id} className="rounded-lg p-3" style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)' }}>
-                <p className="text-xs font-medium" style={{ color: 'var(--br-txt)' }}>{ci.tire.brand} {ci.tire.model}</p>
-                <p className="text-xs font-mono" style={{ color: 'var(--br-txt2)' }}>{ci.tire.size}</p>
-                {/* Targets táctiles 48px + gap-2 (PRODUCT.md §1, separación destructivo). */}
-                <div className="flex items-center justify-between mt-2 gap-2">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => updateQty(ci.tire.id, -1)}
-                      aria-label={`Restar ${ci.tire.brand} ${ci.tire.size}`}
-                      className="w-12 h-12 rounded flex items-center justify-center transition-colors hover:bg-[var(--br-sur2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-amb)] active:bg-[var(--br-bor)]"
-                      style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
-                    >
-                      <Minus className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                    <span className="w-8 text-center text-sm font-semibold tabular-nums" aria-live="polite" aria-atomic="true">{ci.quantity}</span>
-                    <button
-                      type="button"
-                      onClick={() => updateQty(ci.tire.id, 1)}
-                      aria-label={`Sumar ${ci.tire.brand} ${ci.tire.size}`}
-                      className="w-12 h-12 rounded flex items-center justify-center transition-colors hover:bg-[var(--br-sur2)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-amb)] active:bg-[var(--br-bor)]"
-                      style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
-                    >
-                      <Plus className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                  </div>
-                  <span className="text-sm font-semibold font-mono" style={{ color: 'var(--br-amb)' }}>{formatCurrency(ci.subtotal)}</span>
-                  <button
-                    type="button"
-                    onClick={() => setCart((p) => p.filter((i) => i.tire.id !== ci.tire.id))}
-                    aria-label={`Quitar ${ci.tire.brand} ${ci.tire.size} del carrito`}
-                    className="w-12 h-12 ml-2 rounded flex items-center justify-center transition-colors hover:bg-[var(--br-red-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-red)]"
-                    style={{ color: 'var(--br-red)' }}
-                  >
-                    <Trash2 className="h-5 w-5" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Cart footer */}
-        <div className="p-4 space-y-3" style={{ borderTop: '1px solid var(--br-bor)' }}>
-          <div>
-            <label htmlFor="pos-customer" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
-              Cliente {isAccountPaymentMethod(selectedPm) ? '(requerido por Cuenta Corriente)' : '(opcional)'}
-            </label>
-            <Select
-              id="pos-customer"
-              value={customerId}
-              onChange={(e) => setCustomerId(e.target.value)}
-            >
-              <option value="">Sin cliente</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-            {isAccountPaymentMethod(selectedPm) && !customerId && (
-              <p className="text-[11px] mt-1" style={{ color: 'var(--br-red)' }}>
-                Cuenta Corriente exige un cliente: la deuda se asienta a su cuenta.
-              </p>
-            )}
-            {loyalty.enabled && selectedCustomer && customerPointsBalance > 0 && (
-              <div className="mt-2">
-                <label htmlFor="pos-points-redeem" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
-                  Canjear puntos · saldo {customerPointsBalance.toFixed(0)} pts
-                </label>
-                <input
-                  id="pos-points-redeem"
-                  type="number"
-                  min={0}
-                  max={Math.min(customerPointsBalance, subtotalAfterDiscount)}
-                  step={1}
-                  value={pointsToRedeem}
-                  onChange={(e) => setPointsToRedeem(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
-                  style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-                />
-                {requestedPoints > pointsRedeemed && (
-                  <p className="text-[11px] mt-1" style={{ color: 'var(--br-amb)' }}>
-                    Limitado a {pointsRedeemed} pts (saldo o subtotal).
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="pos-payment-method" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
-              Método de pago
-            </label>
-            <Select
-              id="pos-payment-method"
-              value={paymentMethodId}
-              onChange={(e) => setPaymentMethodId(e.target.value)}
-            >
-              {paymentMethods.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}{p.surchargePercent > 0 ? ` (+${p.surchargePercent}%)` : ''}
-                </option>
-              ))}
-            </Select>
-          </div>
-
-          {canDiscount && discounts.length > 0 && (
-            <div>
-              <label htmlFor="pos-discount" className="block text-xs font-semibold uppercase tracking-wide mb-1 flex items-center gap-1" style={{ color: 'var(--br-txt2)' }}>
-                <Tag className="h-3 w-3" aria-hidden="true" /> Descuento
-              </label>
-              <Select
-                id="pos-discount"
-                value={ticketDiscountId}
-                onChange={(e) => { setTicketDiscountId(e.target.value); setPendingDiscountValue(''); }}
-              >
-                <option value="">Sin descuento</option>
-                {discounts.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                    {d.value !== null
-                      ? ` · ${d.type === 'percent' ? `${d.value}%` : formatCurrency(d.value)}`
-                      : ' · pedir valor'}
-                  </option>
-                ))}
-              </Select>
-              {ticketDiscount && ticketDiscount.value === null && (
-                <input
-                  type="number"
-                  value={pendingDiscountValue}
-                  onChange={(e) => setPendingDiscountValue(e.target.value)}
-                  placeholder={ticketDiscount.type === 'percent' ? '% (ej: 10)' : 'Monto $ (ej: 500)'}
-                  aria-label={ticketDiscount.type === 'percent' ? 'Porcentaje de descuento' : 'Monto de descuento'}
-                  min="0"
-                  step="0.01"
-                  className="w-full mt-2 px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
-                  style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-                />
-              )}
-            </div>
-          )}
-
-          <div className="space-y-1 text-sm">
-            <div className="flex justify-between" style={{ color: 'var(--br-txt2)' }}>
-              <span>Subtotal</span>
-              <span className="font-mono">{formatCurrency(subtotal)}</span>
-            </div>
-            {ticketDiscountAmount > 0 && (
-              <div className="flex justify-between text-xs" style={{ color: 'var(--br-grn)' }}>
-                <span>− {ticketDiscount?.name}</span>
-                <span className="font-mono">−{formatCurrency(ticketDiscountAmount)}</span>
-              </div>
-            )}
-            {pointsRedeemed > 0 && (
-              <div className="flex justify-between text-xs" style={{ color: 'var(--br-grn)' }}>
-                <span>− {pointsRedeemed} puntos canjeados</span>
-                <span className="font-mono">−{formatCurrency(pointsRedeemed)}</span>
-              </div>
-            )}
-            {taxBreakdown.included.map(t => (
-              <div key={t.name} className="flex justify-between text-xs" style={{ color: 'var(--br-txt2)' }}>
-                <span>{t.name} (incluido)</span>
-                <span className="font-mono">{formatCurrency(t.amount)}</span>
-              </div>
-            ))}
-            {taxBreakdown.added.map(t => (
-              <div key={t.name} className="flex justify-between text-xs" style={{ color: 'var(--br-txt2)' }}>
-                <span>+ {t.name}</span>
-                <span className="font-mono">{formatCurrency(t.amount)}</span>
-              </div>
-            ))}
-            {surchargeRate > 0 && (
-              <div className="flex justify-between text-xs" style={{ color: 'var(--br-txt2)' }}>
-                <span>Recargo {(surchargeRate * 100).toFixed(0)}%</span>
-                <span className="font-mono">{formatCurrency(surchargeAmount)}</span>
-              </div>
-            )}
-            <div
-              className="flex justify-between items-baseline pt-2 mt-1"
-              style={{ borderTop: '2px solid var(--br-bor)' }}
-            >
-              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--br-txt2)' }}>Total</span>
-              <span className="text-xl font-bold font-mono tabular-nums" style={{ color: 'var(--br-amb)' }}>{formatCurrency(total)}</span>
-            </div>
-          </div>
-
-          <Button
-            variant="success"
-            size="lg"
-            fullWidth
-            onClick={checkout}
-            disabled={!canCheckout}
-            title={!cashSession ? 'Abrí la caja primero' : undefined}
-            className="font-mono tabular-nums"
-          >
-            <span className="font-semibold not-italic" style={{ fontFamily: 'inherit' }}>Cobrar</span>
-            <span className="ml-1">{formatCurrency(total)}</span>
-          </Button>
-
-          <div className="grid grid-cols-2 gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              iconLeft={<Bookmark className="h-3.5 w-3.5" />}
-              onClick={openPark}
-              disabled={cart.length === 0 || !cashSession}
-              title="Guardar ticket abierto (sin cobrar)"
-              fullWidth
-            >
-              Guardar ticket
-            </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-              iconLeft={<Inbox className="h-3.5 w-3.5" />}
-              onClick={() => setParkedListOpen(true)}
-              title="Ver tickets abiertos"
-              fullWidth
-            >
-              Tickets abiertos
-              {parkedTickets.length > 0 && (
-                <span
-                  aria-label={`${parkedTickets.length} ticket(s) abierto(s)`}
-                  className="ml-1.5 px-1.5 min-w-[18px] inline-flex items-center justify-center rounded-full text-[10px] font-bold tabular-nums"
-                  style={{ background: 'var(--br-amb)', color: 'var(--br-bg)' }}
-                >
-                  {parkedTickets.length}
-                </span>
-              )}
-            </Button>
-          </div>
-
-          {resumingParkedId && (
-            <p className="text-[11px] text-center" style={{ color: 'var(--br-amb)' }}>
-              Reanudando ticket abierto · al cobrar se elimina
-            </p>
-          )}
-        </div>
-      </div>
+      <CartPanel
+        cart={cart}
+        setCart={setCart}
+        cashSession={cashSession}
+        customers={customers}
+        customerId={customerId}
+        setCustomerId={setCustomerId}
+        paymentMethods={paymentMethods}
+        paymentMethodId={paymentMethodId}
+        setPaymentMethodId={setPaymentMethodId}
+        selectedPm={selectedPm}
+        selectedCustomer={selectedCustomer}
+        isAccountPaymentMethod={isAccountPaymentMethod}
+        loyalty={loyalty}
+        customerPointsBalance={customerPointsBalance}
+        pointsToRedeem={pointsToRedeem}
+        setPointsToRedeem={setPointsToRedeem}
+        pointsRedeemed={pointsRedeemed}
+        requestedPoints={requestedPoints}
+        subtotalAfterDiscount={subtotalAfterDiscount}
+        canDiscount={canDiscount}
+        discounts={discounts}
+        ticketDiscountId={ticketDiscountId}
+        setTicketDiscountId={setTicketDiscountId}
+        ticketDiscount={ticketDiscount}
+        pendingDiscountValue={pendingDiscountValue}
+        setPendingDiscountValue={setPendingDiscountValue}
+        ticketDiscountAmount={ticketDiscountAmount}
+        subtotal={subtotal}
+        surchargeRate={surchargeRate}
+        surchargeAmount={surchargeAmount}
+        total={total}
+        taxBreakdown={taxBreakdown}
+        updateQty={updateQty}
+        onClearCart={() => setClearCartConfirm(true)}
+        onCheckout={checkout}
+        canCheckout={canCheckout}
+        onOpenPark={openPark}
+        onOpenParkedList={() => setParkedListOpen(true)}
+        parkedTickets={parkedTickets}
+        resumingParkedId={resumingParkedId}
+      />
 
       {/* Checkout modal */}
       <Modal open={checkoutOpen} onClose={() => !confirming && setCheckoutOpen(false)} title="Confirmar venta" size="sm">
