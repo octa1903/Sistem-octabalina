@@ -31,7 +31,12 @@ import { readTable, readSlotVarchar } from '../lib/gdbReader';
 const RELATION_ID_ESTCLIE = 155;
 const ROW_SIZE_MIN = 200;
 
-const PAYMENT_MARKER = /comprobante\s+pago/i;
+// Ampliado post-fragment-fix (2026-05-18): el reassembly de fragments
+// HEAD+TAIL agrega 51k rows ESTCLIE que antes se descartaban. Muchos son
+// "Cancela: / xxxx" (pagos contra factura) y "Pago EFE/TRANS.B/OTRA"
+// (pagos directos de caja). Detectarlos como payment para evitar que
+// inflen el debe del cliente.
+const PAYMENT_MARKER = /(?:comprobante\s+pago|^cancela:|\bpago\s+(efe|trans\.?b|otra|cta)\b|nota\s+(de\s+)?credito)/im;
 
 interface LegacyMov {
   page: number;
@@ -60,19 +65,20 @@ const BLACKLIST_DOUBLES = [
   3686508.38, 3052204.61, 3817610.60, 4804924.51, 4804924.00,
   4804608.13, // visto en ESTCLIE sample (basura RLE de patrón hex 40 24 24 41)
   131104, 131368.06, 132288, 17592,
+  // Post-fragment-fix (2026-05-18): basura constante detectada en offsets
+  // 359, 639, 1159 vía find_junk_pattern.ts. Quedan bajo el cap de $1M.
+  1025792.01, 530192.13, 131072.0, 132768.02, 536761.23,
 ];
 
 function isBlacklisted(v: number): boolean {
   if (v >= 2883600 && v <= 2884000) return true;
-  // Rango de timestamps Firebird internos expandidos por RLE: ~4.8M ± 100k.
-  // Aparecen consistentemente en todos los rows ESTCLIE/ESTPROV y NUNCA son
-  // montos reales (sería absurdo cobrar $4.8M por un servicio de gomería).
-  // Si tu negocio espera movimientos >$1M, ajustar este rango.
-  // Rangos donde caen los timestamps internos Firebird expandidos por RLE.
-  // Empíricamente todos los doubles "basura" caen entre 3.0M-5.4M en ESTCLIE
-  // y NO son montos reales (montos reales >$1M de un cliente individual son
-  // excepcionales en gomería). Tradeoff aceptado: rechazar montos >$3M.
-  if (v >= 3000000) return true;
+  // Post-fragment-fix (2026-05-18): bajar el cap de $3M a $1M.
+  // El reassembly de HEAD+TAIL trae rows con basura RLE adicional. Los
+  // DOUBLEs basura del .gdb caen consistentemente en offsets fijos (359,
+  // 639, 1159, etc.) con valores como $1.025M, $2.39M, $2.53M, $3.31M,
+  // $3.96M, $4.80M, $5.32M. Los montos legítimos individuales de gomería
+  // raramente exceden $1M incluso en pesos AR 2023-2024.
+  if (v >= 1000000) return true;
   for (const b of BLACKLIST_DOUBLES) if (Math.abs(v - b) < 0.05) return true;
   return false;
 }

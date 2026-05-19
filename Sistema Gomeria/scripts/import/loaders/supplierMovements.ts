@@ -88,7 +88,11 @@ const OFF_PROV = 4;
 const OFF_FECHA = 8;
 const OFF_DETALLE = 16;
 
-const PAYMENT_MARKER = /comprobante\s+pago/i;
+// Ampliado post-fragment-fix (2026-05-18): además de "Comprobante pago",
+// detectar "Cancela: / ...", "Pago EFE/TRANS.B/OTRA", y "Nota Credito"
+// como payments. Necesario porque el reassembly de HEAD+TAIL trae rows
+// con estos marcadores.
+const PAYMENT_MARKER = /(?:comprobante\s+pago|^cancela:|\bpago\s+(efe|trans\.?b|otra|cta)\b|nota\s+(de\s+)?credito)/im;
 
 // Doubles "basura" que aparecen consistentemente en buffers ESTPROV
 // (probablemente timestamps internos Firebird o expansiones de RLE de
@@ -100,10 +104,16 @@ const BLACKLIST_DOUBLES = [
   3713692.51, 3708992.32, 3180096.51, 4261153.05,
   3686508.38, 3052204.61, 3817610.60, 4804924.51, 4804924.00,
   131104, 131368.06, 132288, 17592,
+  // Post-fragment-fix: basura constante detectada en offsets fijos
+  1025792.01, 530192.13, 131072.0, 132768.02, 4804608.13,
 ];
 
 function isBlacklisted(v: number): boolean {
   if (v >= 2883600 && v <= 2884000) return true; // timestamps internos
+  // Post-fragment-fix (2026-05-18): cap a $1M para descartar basura RLE en
+  // rango $1M-$5.4M. Movimientos legítimos individuales raramente exceden
+  // este rango en gomería.
+  if (v >= 1000000) return true;
   for (const b of BLACKLIST_DOUBLES) if (Math.abs(v - b) < 0.05) return true;
   return false;
 }
