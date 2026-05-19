@@ -14,6 +14,7 @@ import {
   LOCKOUT_DURATION,
 } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
+import { callUntypedRpc } from '@/services/supabaseHelpers';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -128,8 +129,7 @@ export function useAuth() {
     } else if (auth.sessionType === 'client' && auth.clientToken) {
       // Best-effort: invalidar el token server-side. Si falla, igual limpiamos local.
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await (supabase.rpc as any)('customer_logout', { p_token: auth.clientToken });
+        await callUntypedRpc<unknown>('customer_logout', { p_token: auth.clientToken });
       } catch {
         // ignored
       }
@@ -203,20 +203,25 @@ export function useAuth() {
       setError(null);
       try {
         // RPC SECURITY DEFINER: verifica PIN server-side (con lockout) y devuelve token.
-        // Cast pragmático mientras database.ts no incluya las nuevas RPCs (regen pendiente).
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data, error: rpcErr } = await (supabase.rpc as any)('customer_login', {
-          p_customer_id: clientId,
-          p_pin: pin,
-        });
-        if (rpcErr) {
-          setError(rpcErr.message || 'Credenciales inválidas.');
+        interface CustomerLoginRow {
+          token: string;
+          customer_id: string;
+          customer_name: string;
+          expires_at: string;
+        }
+        let data: CustomerLoginRow | CustomerLoginRow[] | null;
+        try {
+          data = await callUntypedRpc<CustomerLoginRow | CustomerLoginRow[] | null>(
+            'customer_login',
+            { p_customer_id: clientId, p_pin: pin },
+            'customer_login',
+          );
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'Credenciales inválidas.');
           return false;
         }
         // El RPC devuelve un set; tomar la primera fila.
-        const row = (Array.isArray(data) ? data[0] : data) as
-          | { token: string; customer_id: string; customer_name: string; expires_at: string }
-          | undefined;
+        const row = Array.isArray(data) ? data[0] : data ?? undefined;
         if (!row?.token) {
           setError('Credenciales inválidas.');
           return false;

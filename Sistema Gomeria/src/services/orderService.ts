@@ -6,7 +6,7 @@
 // ═══════════════════════════════════════════════════
 
 import { supabase } from './supabaseClient';
-import { ensureNoError, stripUndefined } from './supabaseHelpers';
+import { ensureNoError, stripUndefined, callUntypedRpc } from './supabaseHelpers';
 import type { Order, OrderItem, OrderStatus } from '@/types';
 
 const TABLE = 'customer_orders';
@@ -159,9 +159,7 @@ export const orderService = {
       notes?: string;
     },
   ): Promise<string> {
-    // Cast pragmático: las RPCs nuevas no están en database.ts hasta regen.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.rpc as any)('customer_create_order', {
+    return callUntypedRpc<string>('customer_create_order', {
       p_token: token,
       p_store_id: input.storeId,
       p_items: input.items,
@@ -172,7 +170,5 @@ export const orderService = {
       p_address: input.address ?? null,
       p_notes: input.notes ?? null,
     });
-    if (error) throw error;
-    return data as string;
   },
 };

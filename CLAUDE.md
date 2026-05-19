@@ -21,7 +21,7 @@ Slash commands del proyecto: `/phase-status`, `/check`, `/regen-types`. Ver `.cl
 ## Convenciones críticas
 
 ### Servicios v1 (legacy) vs v2 (Supabase)
-- **v1** (`storageService.ts`): localStorage cifrado AES-GCM. **No usar en código nuevo.** Aún consumido por: `main.tsx`, `AnalyticsView`, `OrdersView`, `MyOrdersView`, `SettingsView` (parcial).
+- **v1** (`storageService.ts`): ya vacío excepto `backupService` (export/import JSON local de localStorage). El único consumidor activo es `SettingsView.tsx` para el botón de backup manual; todo el resto migró a v2.
 - **v2** (`*ServiceV2.ts`, `cashSessionService`, `receiptService`, etc.): Supabase. Mapean row → tipo legacy v1 vía `toLegacy()` para no romper la UI. **Toda lógica nueva consume v2.**
 - Tipos: `src/types/index.ts` (legacy, en uso) + `src/types/database.ts` (Supabase, regenerado a mano — ver `/regen-types`).
 
@@ -44,7 +44,7 @@ Fases hechas: 0, 1, 1.5, 2, 4. Parciales: 3, 5, 6. Pendiente: 7 (realtime/offlin
 - Crear servicios v1 nuevos o tocar `storageService.ts` salvo para borrar.
 - Tablas Supabase sin RLS.
 - npm install en raíz del repo (instalar en `Sistema Gomeria/`).
-- Duplicar lógica de impuestos/descuentos: vive en `utils/buildLine` y `utils/rollupTaxes` (testeados).
+- Tocar lógica de impuestos/descuentos sin extraerla antes a `utils/buildLine` + `utils/rollupTaxes` con tests. Hoy vive embebida en `POSView.tsx` (deuda conocida — Fase B del plan de mejoras).
 - Reescribir UI cuando un mapper `toLegacy()` resuelve el problema.
 
 ## Comunicación

@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════════
 
 import type { PostgrestError } from '@supabase/supabase-js';
+import { supabase } from './supabaseClient';
 
 /**
  * Lanza con un mensaje claro si Supabase devolvió error.
@@ -89,4 +90,36 @@ export function stripUndefined<T extends Record<string, unknown>>(obj: T): any {
     if (v !== undefined) out[k] = v;
   }
   return out;
+}
+
+// ─── RPCs no-tipados ──────────────────────────────────────────────
+// El cliente Supabase está tipado con `Database`, que solo conoce las
+// RPCs declaradas en `types/database.ts`. Las RPCs nuevas (reports,
+// bulk_adjust_tire_prices, customer_create_order, etc.) viven en
+// migraciones aún no regeneradas — por eso `supabase.rpc('foo', ...)`
+// falla en compile-time. Este helper centraliza el cast pragmático
+// con un retorno tipado por el caller, evitando `as any` regado por
+// los services.
+//
+// Cuando regen-types reescriba `database.ts` con las funciones, este
+// helper sigue funcionando idéntico pero ya queda redundante para
+// las RPCs cubiertas.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const untypedRpc = supabase.rpc as unknown as (
+  fn: string,
+  args?: Record<string, unknown>,
+) => Promise<{ data: unknown; error: PostgrestError | null }>;
+
+export async function callUntypedRpc<T>(
+  fn: string,
+  args: Record<string, unknown>,
+  context = fn,
+): Promise<T> {
+  const { data, error } = await untypedRpc(fn, args);
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error(`[supabase rpc] ${context}:`, error.code, error.message, error.hint ?? '');
+    throw new Error(`${context}: ${error.message}`);
+  }
+  return data as T;
 }

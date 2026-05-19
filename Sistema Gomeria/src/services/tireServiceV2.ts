@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { ensureNoError, rowToCamel, camelToRow, stripUndefined } from './supabaseHelpers';
+import { ensureNoError, rowToCamel, camelToRow, stripUndefined, callUntypedRpc } from './supabaseHelpers';
 import type { TireV2, TireStoreOverride, Tire } from '@/types';
 
 const TIRES = 'tires';
@@ -132,8 +132,13 @@ export const tireServiceV2 = {
     touchOverrides?: boolean;
     dryRun?: boolean;
   }): Promise<{ dryRun: boolean; factor: number; tiresCount: number; overridesCount: number }> {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.rpc as any)('bulk_adjust_tire_prices', {
+    interface BulkAdjustRow {
+      dry_run: boolean;
+      factor: number | string;
+      tires_count: number;
+      overrides_count: number;
+    }
+    const r = await callUntypedRpc<BulkAdjustRow>('bulk_adjust_tire_prices', {
       p_pct_delta: args.pctDelta,
       p_brand: args.brand ?? null,
       p_category_id: args.categoryId ?? null,
@@ -143,8 +148,6 @@ export const tireServiceV2 = {
       p_touch_overrides: !!args.touchOverrides,
       p_dry_run: args.dryRun ?? true,
     });
-    if (error) throw error;
-    const r = data as { dry_run: boolean; factor: number; tires_count: number; overrides_count: number };
     return {
       dryRun: r.dry_run,
       factor: Number(r.factor),

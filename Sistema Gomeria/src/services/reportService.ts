@@ -3,8 +3,7 @@
 // Las agregaciones viven en Postgres (migración 0004_reports.sql).
 // ═══════════════════════════════════════════════════
 
-import { supabase } from './supabaseClient';
-import { rowToCamel } from './supabaseHelpers';
+import { rowToCamel, callUntypedRpc } from './supabaseHelpers';
 
 export interface ReportFilters {
   /** ISO datetime (inclusive). */
@@ -129,14 +128,9 @@ function buildArgs(f: ReportFilters, includeEmployee = true) {
 
 async function callRpc<T extends object>(fn: string, args: Record<string, unknown>): Promise<T[]> {
   // Las funciones `report_*` viven en la migración 0004 y no están todavía
-  // en `types/database.ts` (regenerar tras aplicarla). Cast pragmático:
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.rpc as any)(fn, args);
-  if (error) {
-    // eslint-disable-next-line no-console
-    console.error(`[reportService] ${fn}:`, error.code, error.message);
-    throw new Error(`${fn}: ${error.message}`);
-  }
+  // en `types/database.ts` (regenerar tras aplicarla). callUntypedRpc
+  // centraliza el escape hatch.
+  const data = await callUntypedRpc<unknown>(fn, args, `reportService.${fn}`);
   if (!Array.isArray(data)) return [];
   return (data as Record<string, unknown>[]).map(r => rowToCamel<T>(r));
 }

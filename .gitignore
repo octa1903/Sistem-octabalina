@@ -19,3 +19,8 @@ codex-capabilities/
 /index.html
 balina-backup-*.json
 sf_listing.md
+
+# Secrets locales — solo .env.example se trackea
+Sistema Gomeria/.env
+Sistema Gomeria/.env.local
+Sistema Gomeria/.env.*.local
