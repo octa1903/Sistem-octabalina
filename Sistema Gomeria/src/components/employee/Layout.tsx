@@ -149,10 +149,7 @@ export function EmployeeApp({ auth }: Props) {
           {current.employee && (
             <button
               onClick={current.logout}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors"
-              style={{ color: 'var(--br-dark-txt2)' }}
-              onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
-              onMouseOut={(e) => (e.currentTarget.style.color = 'var(--br-dark-txt2)')}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-[var(--br-dark-txt2)] hover:text-white hover:bg-white/8"
               title="Cambiar operador (no cierra sesión web)"
             >
               <UserCog className="h-5 w-5 flex-shrink-0" />
@@ -161,10 +158,7 @@ export function EmployeeApp({ auth }: Props) {
           )}
           <button
             onClick={() => { current.logout(); auth.logout(); }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors"
-            style={{ color: 'var(--br-dark-txt2)' }}
-            onMouseOver={(e) => (e.currentTarget.style.color = '#fff')}
-            onMouseOut={(e) => (e.currentTarget.style.color = 'var(--br-dark-txt2)')}
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-[var(--br-dark-txt2)] hover:text-white hover:bg-white/8"
           >
             <LogOut className="h-5 w-5 flex-shrink-0" />
             <span className="hidden lg:block text-sm">Salir</span>
@@ -243,7 +237,10 @@ export function EmployeeApp({ auth }: Props) {
         <EmployeeSelector
           storeId={stores.activeStoreId}
           loginWithPin={current.loginWithPin}
-          onSelected={() => addToast('Operador identificado.', 'success')}
+          onSelected={(r) => {
+            if (r.ok) addToast('Operador identificado.', 'success');
+            else addToast(r.reason, 'error');
+          }}
         />
       )}
 

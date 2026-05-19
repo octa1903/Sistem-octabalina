@@ -31,12 +31,12 @@ export type PaymentMethodId = (typeof PAYMENT_METHODS)[number]['id'];
 
 // ─── Order Status ───────────────────────────────────
 export const STATUS_COLORS: Record<string, string> = {
-  pendiente: 'bg-gray-100 text-gray-700 border-gray-300',
-  confirmado: 'bg-blue-100 text-blue-700 border-blue-300',
-  en_preparacion: 'bg-amber-100 text-amber-700 border-amber-300',
-  listo: 'bg-green-100 text-green-700 border-green-300',
-  entregado: 'bg-emerald-200 text-emerald-800 border-emerald-400',
-  cancelado: 'bg-red-100 text-red-700 border-red-300',
+  pendiente:      'bg-[var(--br-sur2)] text-[var(--br-txt2)] border-[var(--br-bor)]',
+  confirmado:     'bg-[var(--br-info-bg)] text-[var(--br-info)] border-[var(--br-info-bor)]',
+  en_preparacion: 'bg-[var(--br-amb-bg)] text-[var(--br-amb)] border-[var(--br-amb-bor)]',
+  listo:          'bg-[var(--br-grn-bg)] text-[var(--br-grn)] border-[var(--br-grn-bor)]',
+  entregado:      'bg-[var(--br-grn-bg)] text-[var(--br-grn)] border-[var(--br-grn-bor)]',
+  cancelado:      'bg-[var(--br-red-bg)] text-[var(--br-red)] border-[var(--br-red-bor)]',
 };
 
 export const STATUS_LABELS: Record<string, string> = {

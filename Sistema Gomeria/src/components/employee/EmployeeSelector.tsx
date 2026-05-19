@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Employee } from '@/types';
 import { employeeService } from '@/services/employeeService';
-import { LogIn, User } from 'lucide-react';
+import { AlertCircle, LogIn, User } from 'lucide-react';
 
 interface Props {
   storeId: string;
@@ -23,6 +23,7 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
   const [pin, setPin] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const mountedRef = useRef(true);
+  const pinInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
   useEffect(() => {
@@ -50,6 +51,8 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
     if (!r.ok) {
       setError(r.reason);
       setPin('');
+      // Devolver foco al input para que el operador pueda reintentar sin levantar la vista.
+      setTimeout(() => pinInputRef.current?.focus(), 0);
       return;
     }
     onSelected(r);
@@ -122,21 +125,34 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
                 PIN
               </label>
               <input
+                ref={pinInputRef}
                 type="password"
                 inputMode="numeric"
                 maxLength={8}
                 autoFocus
                 value={pin}
-                onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+                onChange={(e) => { setPin(e.target.value.replace(/\D/g, '')); setError(null); }}
                 placeholder="••••"
-                className="w-full px-3 py-2.5 rounded-lg text-sm outline-none text-center tracking-widest"
-                style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={error ? 'pin-error' : undefined}
+                className="w-full px-3 py-2.5 rounded-lg text-sm outline-none text-center tracking-widest focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
+                style={{
+                  border: `1px solid ${error ? 'var(--br-red)' : 'var(--br-bor)'}`,
+                  background: 'var(--br-sur)',
+                  color: 'var(--br-txt)',
+                }}
               />
             </div>
           )}
 
           {error && (
-            <p className="text-sm rounded-lg px-3 py-2" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}>
+            <p
+              id="pin-error"
+              role="alert"
+              className="text-sm rounded-lg px-3 py-2 flex items-center gap-2"
+              style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}
+            >
+              <AlertCircle className="h-4 w-4 flex-shrink-0" aria-hidden="true" />
               {error}
             </p>
           )}

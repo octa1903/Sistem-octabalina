@@ -167,8 +167,8 @@ export function EmployeesSection({ addToast }: Props) {
   async function toggleActive(emp: Employee) {
     try {
       await employeeService.setActive(emp.id, !emp.active);
-      await refresh();
       addToast(emp.active ? `${emp.name} desactivado.` : `${emp.name} activado.`, 'success');
+      await refresh();
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error cambiando estado.', 'error');
     }

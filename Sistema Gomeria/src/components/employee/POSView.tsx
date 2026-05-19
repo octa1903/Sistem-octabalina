@@ -457,8 +457,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
         try {
           await receiptService.deleteParked(resumingParkedId);
         } catch {
-          // Si falla la eliminación del parked, no rompemos el flujo;
-          // el listado se recargará con reloadParked() y el usuario puede borrarlo.
+          addToast('Venta registrada. El ticket abierto no se pudo eliminar — borralo desde "Tickets abiertos".', 'warning');
         }
         setResumingParkedId(null);
         await reloadParked();
@@ -545,7 +544,9 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
 
       // Si estábamos reanudando otro ticket, lo borramos para no duplicar.
       if (resumingParkedId) {
-        try { await receiptService.deleteParked(resumingParkedId); } catch { /* noop */ }
+        try { await receiptService.deleteParked(resumingParkedId); } catch {
+          addToast('Ticket guardado. El anterior no se pudo eliminar — borralo desde "Tickets abiertos".', 'warning');
+        }
         setResumingParkedId(null);
       }
 
@@ -677,17 +678,17 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
                     key={row.tire.id}
                     onClick={() => addToCart(row)}
                     aria-label={`Agregar ${row.tire.brand} ${row.tire.size} ${formatCurrency(row.price)}, ${row.stock} en stock`}
-                    className="group text-left rounded-xl p-3 transition-colors duration-150 border border-[var(--br-bor)] bg-[var(--br-sur)] hover:border-[var(--br-amb)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-amb)] active:bg-[var(--br-sur2)] motion-safe:active:scale-[0.98] transition-transform"
+                    className="group text-left rounded-xl p-3 transition-all duration-150 border border-[var(--br-bor)] bg-[var(--br-sur)] hover:border-[var(--br-amb)] hover:shadow-[var(--br-shadow-md)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--br-amb)] active:bg-[var(--br-sur2)] motion-safe:active:scale-[0.98]"
                   >
-                    <p className="text-xs font-medium" style={{ color: 'var(--br-txt2)' }}>{row.tire.brand}</p>
-                    <p className="font-mono text-sm font-semibold" style={{ color: 'var(--br-txt)' }}>{row.tire.size}</p>
-                    <p className="text-xs truncate" style={{ color: 'var(--br-txt2)' }}>{row.tire.model}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="font-semibold text-sm" style={{ color: 'var(--br-amb)' }}>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide leading-none mb-1" style={{ color: 'var(--br-txt2)' }}>{row.tire.brand}</p>
+                    <p className="font-mono text-base font-bold leading-tight" style={{ color: 'var(--br-txt)' }}>{row.tire.size}</p>
+                    <p className="text-xs truncate mt-0.5" style={{ color: 'var(--br-txt2)' }}>{row.tire.model}</p>
+                    <div className="flex items-center justify-between mt-2.5">
+                      <span className="font-bold text-sm font-mono" style={{ color: 'var(--br-amb)' }}>
                         {formatCurrency(row.price)}
                       </span>
                       <span
-                        className="text-xs px-1.5 py-0.5 rounded-full"
+                        className="text-[11px] px-1.5 py-0.5 rounded-full font-semibold"
                         style={{
                           color: low ? 'var(--br-red)' : 'var(--br-grn)',
                           background: low ? 'var(--br-red-bg)' : 'var(--br-grn-bg)',
@@ -920,9 +921,12 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
                 <span className="font-mono">{formatCurrency(surchargeAmount)}</span>
               </div>
             )}
-            <div className="flex justify-between font-semibold text-base" style={{ color: 'var(--br-txt)' }}>
-              <span>Total</span>
-              <span className="font-mono" style={{ color: 'var(--br-amb)' }}>{formatCurrency(total)}</span>
+            <div
+              className="flex justify-between items-baseline pt-2 mt-1"
+              style={{ borderTop: '2px solid var(--br-bor)' }}
+            >
+              <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--br-txt2)' }}>Total</span>
+              <span className="text-xl font-bold font-mono tabular-nums" style={{ color: 'var(--br-amb)' }}>{formatCurrency(total)}</span>
             </div>
           </div>
 

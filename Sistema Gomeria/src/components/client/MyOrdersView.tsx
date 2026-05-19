@@ -11,18 +11,21 @@ interface Props { clientToken: string | undefined; }
 export function MyOrdersView({ clientToken }: Props) {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<Order | null>(null);
 
   useEffect(() => {
     let active = true;
     if (!clientToken) {
+      setError('Sesión expirada. Volvé a iniciar sesión.');
       setLoading(false);
       return;
     }
     setLoading(true);
+    setError(null);
     customerSelfService.getOrders(clientToken)
       .then((data) => { if (active) setOrders(data); })
-      .catch(() => { /* errores silenciosos: el cliente ve "sin pedidos" */ })
+      .catch((e) => { if (active) setError(e instanceof Error ? e.message : 'Error cargando pedidos.'); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [clientToken]);
@@ -66,6 +69,11 @@ export function MyOrdersView({ clientToken }: Props) {
 
       {loading ? (
         <p className="text-sm text-center py-16" style={{ color: 'var(--br-txt2)' }}>Cargando pedidos…</p>
+      ) : error ? (
+        <div className="text-center py-16 rounded-xl" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-red-bor)' }}>
+          <Package className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--br-red)' }} />
+          <p className="text-sm font-medium" style={{ color: 'var(--br-red)' }}>{error}</p>
+        </div>
       ) : orders.length === 0 ? (
         <div className="text-center py-16 rounded-xl" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
           <Package className="h-10 w-10 mx-auto mb-3" style={{ color: 'var(--br-txt2)' }} />

@@ -52,14 +52,14 @@ export function AccountsView({ addToast, employeeId }: Props) {
   }, [search]);
 
   const loadCustomers = useCallback(async (f: Filter, term: string) => {
+    if (f === 'all' && !term) {
+      setCustomers([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       if (f === 'all') {
-        // Modo "Todos" requiere búsqueda: 5175 clientes no caben en UI sin filtro.
-        if (!term) {
-          setCustomers([]);
-          return;
-        }
         const list = await customerServiceV2.search(term, 200);
         setCustomers(list);
       } else {
