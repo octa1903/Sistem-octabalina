@@ -55,6 +55,14 @@ describe('hasPermission', () => {
     expect(hasPermission(cajero, 'employees.manage')).toBe(false);
     expect(hasPermission(cajero, 'settings.manage')).toBe(false);
   });
+
+  it('reports.audit es un permiso reconocido (migration 0030)', () => {
+    // El cajero no tiene reports.audit por default; el propietario sí cuando
+    // se lo asignen explícitamente. Este test fija el contrato del tipo.
+    expect(hasPermission(cajero, 'reports.audit')).toBe(false);
+    const auditor: Role = { ...cajero, permissions: [...cajero.permissions, 'reports.audit'] };
+    expect(hasPermission(auditor, 'reports.audit')).toBe(true);
+  });
 });
 
 describe('maxDiscountFor', () => {

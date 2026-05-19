@@ -289,6 +289,7 @@ export type Permission =
   | 'tires.view'
   | 'tires.manage'
   | 'reports.view'
+  | 'reports.audit'         // Lectura del audit_log (migration 0030)
   | 'employees.manage'
   | 'customers.view'
   | 'customers.manage'
