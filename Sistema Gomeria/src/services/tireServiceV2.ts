@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import { ensureNoError, rowToCamel, camelToRow, stripUndefined, callUntypedRpc } from './supabaseHelpers';
+import { ensureNoError, rowToCamel, camelToRow, stripUndefined, callUntypedRpc, fetchAllPaginated } from './supabaseHelpers';
 import type { TireV2, TireStoreOverride, Tire } from '@/types';
 
 const TIRES = 'tires';
@@ -9,11 +9,12 @@ export const tireServiceV2 = {
   // ── Tire raíz ──────────────────────────────────────
 
   async getAll(): Promise<TireV2[]> {
-    const { data, error } = await supabase
-      .from(TIRES)
-      .select('*')
-      .order('brand', { ascending: true });
-    return ensureNoError(data, error, 'tireServiceV2.getAll').map(r => rowToCamel<TireV2>(r));
+    // Paginar para superar el max-rows=1000 de PostgREST en Supabase.
+    const rows = await fetchAllPaginated<Record<string, unknown>>(
+      () => supabase.from(TIRES).select('*').order('brand', { ascending: true }),
+      'tireServiceV2.getAll',
+    );
+    return rows.map(r => rowToCamel<TireV2>(r));
   },
 
   async getById(id: string): Promise<TireV2 | undefined> {
@@ -66,13 +67,12 @@ export const tireServiceV2 = {
   },
 
   async getOverridesByStore(storeId: string): Promise<TireStoreOverride[]> {
-    const { data, error } = await supabase
-      .from(OVERRIDES)
-      .select('*')
-      .eq('store_id', storeId);
-    return ensureNoError(data, error, 'tireServiceV2.getOverridesByStore').map(r =>
-      rowToCamel<TireStoreOverride>(r),
+    // Paginar: una tienda con catálogo grande puede pasar el cap de 1000.
+    const rows = await fetchAllPaginated<Record<string, unknown>>(
+      () => supabase.from(OVERRIDES).select('*').eq('store_id', storeId),
+      'tireServiceV2.getOverridesByStore',
     );
+    return rows.map(r => rowToCamel<TireStoreOverride>(r));
   },
 
   async getOverridesByTire(tireId: string): Promise<TireStoreOverride[]> {

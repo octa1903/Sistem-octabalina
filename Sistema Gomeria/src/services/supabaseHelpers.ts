@@ -92,6 +92,56 @@ export function stripUndefined<T extends Record<string, unknown>>(obj: T): any {
   return out;
 }
 
+// ─── Paginación ───────────────────────────────────────────────────
+// PostgREST en Supabase aplica `max-rows = 1000` por defecto. Un
+// `.select()` plano de una tabla con >1000 filas devuelve solo las
+// primeras 1000, sin error. Para tablas que pueden crecer (tires,
+// receipts, customers en cuenta corriente, overrides), usar este
+// helper con `.range(from, to)` para traer todo en batches.
+
+const PAGE_SIZE = 1000;
+
+/**
+ * Pagina sobre cualquier query builder de Supabase aplicando `.range()`
+ * hasta que un batch venga con menos filas que `PAGE_SIZE`. El builder
+ * se reconstruye en cada batch via `buildQuery()` porque PostgREST
+ * consume el builder en cada `await`.
+ *
+ * Ejemplo:
+ * ```ts
+ * const all = await fetchAllPaginated<TireRow>(() =>
+ *   supabase.from('tires').select('id, brand, model, size').order('brand'),
+ *   'tires.listAll',
+ * );
+ * ```
+ */
+export async function fetchAllPaginated<T>(
+  // El builder de PostgREST es un thenable con tipos genéricos profundos.
+  // No vale la pena replicar su shape exacta acá; el caller infiere T del select().
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  buildQuery: () => any,
+  context: string,
+): Promise<T[]> {
+  const out: T[] = [];
+  let from = 0;
+  // Cap defensivo: 100 páginas = 100k filas. Si lo superás, hay algo raro
+  // y mejor un timeout que un loop infinito.
+  for (let page = 0; page < 100; page++) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await buildQuery().range(from, to);
+    if (error) {
+      // eslint-disable-next-line no-console
+      console.error(`[supabase paginate] ${context}:`, error.code, error.message, error.hint ?? '');
+      throw new Error(`${context}: ${error.message}`);
+    }
+    const batch = data ?? [];
+    out.push(...batch);
+    if (batch.length < PAGE_SIZE) return out;
+    from += PAGE_SIZE;
+  }
+  throw new Error(`${context}: superado el límite de paginación (100k filas)`);
+}
+
 // ─── RPCs no-tipados ──────────────────────────────────────────────
 // El cliente Supabase está tipado con `Database`, que solo conoce las
 // RPCs declaradas en `types/database.ts`. Las RPCs nuevas (reports,
