@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       app_features: {
@@ -93,6 +68,60 @@ export type Database = {
         }
         Relationships: []
       }
+      audit_log: {
+        Row: {
+          action: string
+          after: Json | null
+          before: Json | null
+          created_at: string
+          employee_id: string | null
+          entity_id: string | null
+          entity_type: string
+          id: string
+          reason: string | null
+          store_id: string
+        }
+        Insert: {
+          action: string
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          employee_id?: string | null
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          reason?: string | null
+          store_id: string
+        }
+        Update: {
+          action?: string
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          employee_id?: string | null
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          reason?: string | null
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       banks: {
         Row: {
           active: boolean
@@ -133,6 +162,8 @@ export type Database = {
           cash_session_id: string
           employee_id: string
           id: string
+          import_batch_id: string | null
+          legacy_id: string | null
           reason: string
           type: string
         }
@@ -142,6 +173,8 @@ export type Database = {
           cash_session_id: string
           employee_id: string
           id?: string
+          import_batch_id?: string | null
+          legacy_id?: string | null
           reason: string
           type: string
         }
@@ -151,6 +184,8 @@ export type Database = {
           cash_session_id?: string
           employee_id?: string
           id?: string
+          import_batch_id?: string | null
+          legacy_id?: string | null
           reason?: string
           type?: string
         }
@@ -169,6 +204,13 @@ export type Database = {
             referencedRelation: "employees"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "cash_movements_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
         ]
       }
       cash_sessions: {
@@ -178,6 +220,7 @@ export type Database = {
           counted_cash: number | null
           expected_cash: number | null
           id: string
+          import_batch_id: string | null
           notes: string | null
           opened_at: string
           opened_by_employee_id: string
@@ -192,6 +235,7 @@ export type Database = {
           counted_cash?: number | null
           expected_cash?: number | null
           id?: string
+          import_batch_id?: string | null
           notes?: string | null
           opened_at?: string
           opened_by_employee_id: string
@@ -206,6 +250,7 @@ export type Database = {
           counted_cash?: number | null
           expected_cash?: number | null
           id?: string
+          import_batch_id?: string | null
           notes?: string | null
           opened_at?: string
           opened_by_employee_id?: string
@@ -220,6 +265,13 @@ export type Database = {
             columns: ["closed_by_employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_sessions_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
             referencedColumns: ["id"]
           },
           {
@@ -382,6 +434,7 @@ export type Database = {
           employee_id: string | null
           id: string
           import_batch_id: string | null
+          legacy_id: string | null
           notes: string | null
           payment_method_id: string | null
           receipt_id: string | null
@@ -394,6 +447,7 @@ export type Database = {
           employee_id?: string | null
           id?: string
           import_batch_id?: string | null
+          legacy_id?: string | null
           notes?: string | null
           payment_method_id?: string | null
           receipt_id?: string | null
@@ -406,6 +460,7 @@ export type Database = {
           employee_id?: string | null
           id?: string
           import_batch_id?: string | null
+          legacy_id?: string | null
           notes?: string | null
           payment_method_id?: string | null
           receipt_id?: string | null
@@ -2210,6 +2265,22 @@ export type Database = {
           type: string
         }[]
       }
+      log_action: {
+        Args: {
+          p_action: string
+          p_after?: Json
+          p_before?: Json
+          p_entity_id?: string
+          p_entity_type: string
+          p_reason?: string
+          p_store_id: string
+        }
+        Returns: string
+      }
+      recompute_customer_account_balance: {
+        Args: { p_customer_id: string }
+        Returns: undefined
+      }
       recompute_customer_metrics: {
         Args: { p_customer_id: string }
         Returns: undefined
@@ -2351,9 +2422,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {},
   },
