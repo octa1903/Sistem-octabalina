@@ -24,3 +24,6 @@ sf_listing.md
 Sistema Gomeria/.env
 Sistema Gomeria/.env.local
 Sistema Gomeria/.env.*.local
+
+# Staging local: CSVs de proveedores y archivos de normalización.
+Sistema Gomeria/tmp/
