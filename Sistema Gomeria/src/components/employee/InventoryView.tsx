@@ -4,6 +4,7 @@ import { tireServiceV2 } from '@/services/tireServiceV2';
 import { categoryService } from '@/services/categoryService';
 import { taxService } from '@/services/taxService';
 import { formatCurrency, calculateSalePrice } from '@/utils/currency';
+import { compareTireSize } from '@/utils/tireSize';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ImportModal } from '@/components/employee/import/ImportModal';
@@ -106,12 +107,20 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return tires.filter(t => {
+    const result = tires.filter(t => {
       if (onlyLow && t.stock > t.minStock) return false;
       if (filterCat && t.category !== filterCat) return false;
       if (filterBrand && t.brand !== filterBrand) return false;
       if (q && !`${t.brand} ${t.model} ${t.size}`.toLowerCase().includes(q)) return false;
       return true;
+    });
+    // Orden: marca asc → rodado asc → ancho asc → perfil → modelo.
+    return result.sort((a, b) => {
+      const brandCmp = a.brand.localeCompare(b.brand, 'es', { sensitivity: 'base' });
+      if (brandCmp !== 0) return brandCmp;
+      const sizeCmp = compareTireSize(a.size, b.size);
+      if (sizeCmp !== 0) return sizeCmp;
+      return a.model.localeCompare(b.model, 'es', { sensitivity: 'base' });
     });
   }, [tires, search, filterCat, filterBrand, onlyLow]);
 
