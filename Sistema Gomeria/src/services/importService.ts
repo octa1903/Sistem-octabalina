@@ -5,8 +5,9 @@
 
 import * as XLSX from 'xlsx';
 import { supabase } from './supabaseClient';
-import { ensureNoError } from './supabaseHelpers';
+import { ensureNoError, fetchAllPaginated } from './supabaseHelpers';
 import { hashPin } from '@/utils/hash';
+import { describeError } from '@/utils/errorMessage';
 import type { Category } from '@/types';
 
 export type RawRow = Record<string, unknown>;
@@ -136,13 +137,15 @@ export async function bulkInsertTires(
   const catByName = new Map(categories.map(c => [normalize(c.name), c.id]));
   const summary: ImportSummary = { inserted: 0, failed: 0, errors: [] };
 
-  // Cargar tires existentes para detectar duplicados (por brand+model+size case-insensitive)
-  const { data: existing, error: exErr } = await supabase
-    .from('tires')
-    .select('id, brand, model, size');
-  if (exErr) throw exErr;
+  // Cargar tires existentes para detectar duplicados (por brand+model+size case-insensitive).
+  // Paginar: con >1000 tires, un select plano devuelve solo los primeros 1000 y
+  // el resto se intenta insertar → falla por unique constraint o crea duplicados.
+  const existing = await fetchAllPaginated<{ id: string; brand: string; model: string; size: string }>(
+    () => supabase.from('tires').select('id, brand, model, size'),
+    'bulkInsertTires.loadExisting',
+  );
   const existingByKey = new Map<string, string>();
-  for (const t of existing ?? []) {
+  for (const t of existing) {
     const key = `${normalize(t.brand)}|${normalize(t.model)}|${normalize(t.size)}`;
     existingByKey.set(key, t.id);
   }
@@ -185,6 +188,8 @@ export async function bulkInsertTires(
           .single();
         if (error) throw error;
         tireId = data.id;
+        // Registrar para que duplicados intra-archivo se traten como update
+        existingByKey.set(key, tireId);
       }
 
       // Override por tienda
@@ -203,8 +208,10 @@ export async function bulkInsertTires(
 
       summary.inserted++;
     } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error(`[import tires] fila ${i + 1}:`, e);
       summary.failed++;
-      summary.errors.push({ rowIndex: i, error: e instanceof Error ? e.message : 'Error desconocido' });
+      summary.errors.push({ rowIndex: i, error: describeError(e) });
     }
   }
   return summary;
@@ -285,8 +292,10 @@ export async function bulkInsertCustomers(parsed: CustomerImportRow[]): Promise<
       if (error) throw error;
       summary.inserted++;
     } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error(`[import customers] fila ${i + 1}:`, e);
       summary.failed++;
-      summary.errors.push({ rowIndex: i, error: e instanceof Error ? e.message : 'Error desconocido' });
+      summary.errors.push({ rowIndex: i, error: describeError(e) });
     }
   }
   return summary;
