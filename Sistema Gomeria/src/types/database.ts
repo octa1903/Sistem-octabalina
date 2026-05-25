@@ -809,6 +809,56 @@ export type Database = {
           },
         ]
       }
+      exchange_rates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_date: string
+          fetched_at: string
+          from_currency: string
+          id: string
+          rate: number
+          rate_buy: number
+          rate_sell: number
+          source: string
+          to_currency: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_date: string
+          fetched_at?: string
+          from_currency?: string
+          id?: string
+          rate?: number
+          rate_buy: number
+          rate_sell: number
+          source: string
+          to_currency?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_date?: string
+          fetched_at?: string
+          from_currency?: string
+          id?: string
+          rate?: number
+          rate_buy?: number
+          rate_sell?: number
+          source?: string
+          to_currency?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "exchange_rates_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_batches: {
         Row: {
           created_at: string
@@ -1751,6 +1801,127 @@ export type Database = {
           },
         ]
       }
+      supplier_price_list_items: {
+        Row: {
+          cost_ars: number
+          cost_original: number
+          created_at: string
+          id: string
+          price_list_id: string
+          price_suggested: number | null
+          raw_brand: string | null
+          raw_model: string | null
+          raw_sku: string | null
+          raw_size: string
+          tire_id: string | null
+        }
+        Insert: {
+          cost_ars: number
+          cost_original: number
+          created_at?: string
+          id?: string
+          price_list_id: string
+          price_suggested?: number | null
+          raw_brand?: string | null
+          raw_model?: string | null
+          raw_sku?: string | null
+          raw_size: string
+          tire_id?: string | null
+        }
+        Update: {
+          cost_ars?: number
+          cost_original?: number
+          created_at?: string
+          id?: string
+          price_list_id?: string
+          price_suggested?: number | null
+          raw_brand?: string | null
+          raw_model?: string | null
+          raw_sku?: string | null
+          raw_size?: string
+          tire_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_price_list_items_price_list_id_fkey"
+            columns: ["price_list_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_price_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_price_list_items_tire_id_fkey"
+            columns: ["tire_id"]
+            isOneToOne: false
+            referencedRelation: "tires"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      supplier_price_lists: {
+        Row: {
+          currency: string
+          effective_date: string
+          exchange_rate_id: string | null
+          id: string
+          imported_at: string
+          imported_by: string | null
+          list_name: string
+          notes: string | null
+          row_count: number
+          supplier_id: string | null
+          supplier_name: string
+        }
+        Insert: {
+          currency?: string
+          effective_date: string
+          exchange_rate_id?: string | null
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          list_name: string
+          notes?: string | null
+          row_count?: number
+          supplier_id?: string | null
+          supplier_name: string
+        }
+        Update: {
+          currency?: string
+          effective_date?: string
+          exchange_rate_id?: string | null
+          id?: string
+          imported_at?: string
+          imported_by?: string | null
+          list_name?: string
+          notes?: string | null
+          row_count?: number
+          supplier_id?: string | null
+          supplier_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_price_lists_exchange_rate_id_fkey"
+            columns: ["exchange_rate_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_rates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_price_lists_imported_by_fkey"
+            columns: ["imported_by"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_price_lists_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           account_balance: number
@@ -2180,6 +2351,34 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tire_latest_cost: {
+        Row: {
+          cost_ars: number | null
+          cost_original: number | null
+          currency: string | null
+          effective_date: string | null
+          exchange_rate_id: string | null
+          list_name: string | null
+          supplier_name: string | null
+          tire_id: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_price_lists_exchange_rate_id_fkey"
+            columns: ["exchange_rate_id"]
+            isOneToOne: false
+            referencedRelation: "exchange_rates"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_price_list_items_tire_id_fkey"
+            columns: ["tire_id"]
+            isOneToOne: false
+            referencedRelation: "tires"
             referencedColumns: ["id"]
           },
         ]

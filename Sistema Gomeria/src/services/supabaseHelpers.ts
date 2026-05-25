@@ -173,3 +173,4 @@ export async function callUntypedRpc<T>(
   }
   return data as T;
 }
+

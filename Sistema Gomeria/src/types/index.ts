@@ -853,3 +853,64 @@ export interface AppData {
   employeeHash: string;
   lastBackup: string | null;
 }
+
+// ─── Cotizaciones y listas de proveedores (0032) ──────────────────────
+
+export type ExchangeRateSource = 'ambito-informal' | 'manual';
+
+export interface ExchangeRate {
+  id: string;
+  fromCurrency: 'USD';
+  toCurrency: 'ARS';
+  rateBuy: number;
+  rateSell: number;
+  /** Precio de equilibrio = (rateBuy + rateSell) / 2. Es el valor para convertir USD→ARS. */
+  rate: number;
+  effectiveDate: string; // YYYY-MM-DD
+  source: ExchangeRateSource;
+  fetchedAt: string;
+}
+
+export type SupplierListCurrency = 'ARS' | 'USD';
+
+export interface SupplierPriceList {
+  id: string;
+  supplierId: string | null;
+  supplierName: string;
+  listName: string;
+  currency: SupplierListCurrency;
+  exchangeRateId: string | null;
+  effectiveDate: string; // YYYY-MM-DD
+  importedAt: string;
+  importedBy: string | null;
+  rowCount: number;
+  notes: string | null;
+}
+
+export interface SupplierPriceListItem {
+  id: string;
+  priceListId: string;
+  tireId: string | null;
+  rawSku: string | null;
+  rawSize: string;
+  rawBrand: string | null;
+  rawModel: string | null;
+  /** Costo en la moneda original de la lista. */
+  costOriginal: number;
+  /** Costo en ARS (= costOriginal para listas ARS, = costOriginal * rate para USD). */
+  costArs: number;
+  priceSuggested: number | null;
+  createdAt: string;
+}
+
+/** Vista derivada (`tire_latest_cost`): último costo importado por neumático. */
+export interface TireLatestCost {
+  tireId: string;
+  costArs: number;
+  costOriginal: number;
+  currency: SupplierListCurrency;
+  effectiveDate: string;
+  supplierName: string;
+  listName: string;
+  exchangeRateId: string | null;
+}

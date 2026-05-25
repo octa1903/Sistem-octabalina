@@ -6,6 +6,8 @@ import {
   bulkInsertTires, bulkInsertCustomers, downloadTemplate,
   type RawRow, type TireImportResult, type CustomerImportResult, type ImportSummary,
 } from '@/services/importService';
+import { supplierPriceListService } from '@/services/supplierPriceListServiceV2';
+import { todayIso } from '@/services/exchangeRateServiceV2';
 import type { Category } from '@/types';
 
 type Kind = 'tires' | 'customers';
@@ -30,6 +32,13 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
   const [customerResults, setCustomerResults] = useState<CustomerImportResult[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
+  // Solo aplica a `kind === 'tires'`: si el usuario completa estos campos
+  // además de importar el catálogo se crea un snapshot en
+  // `supplier_price_lists` para tener histórico de costos por proveedor.
+  const [supplierName, setSupplierName] = useState('');
+  const [listDate, setListDate] = useState(todayIso());
+  const [listNotes, setListNotes] = useState('');
+  const [snapshotInfo, setSnapshotInfo] = useState<{ listId: string; matched: number } | null>(null);
 
   const validCount = kind === 'tires'
     ? tireResults.filter(r => r.parsed && !r.error).length
@@ -46,6 +55,10 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
     setCustomerResults([]);
     setError(null);
     setSummary(null);
+    setSupplierName('');
+    setListDate(todayIso());
+    setListNotes('');
+    setSnapshotInfo(null);
     if (fileRef.current) fileRef.current.value = '';
   }
 
@@ -85,8 +98,40 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
       let result: ImportSummary;
       if (kind === 'tires') {
         if (!storeId || !categories) throw new Error('Faltan storeId o categorías.');
-        const valid = tireResults.filter(r => r.parsed && !r.error).map(r => r.parsed!);
+        const validResults = tireResults.filter(r => r.parsed && !r.error);
+        const valid = validResults.map(r => r.parsed!);
         result = await bulkInsertTires(valid, storeId, categories);
+
+        // Si el usuario completó proveedor, además crear snapshot histórico
+        // de la lista (supplier_price_lists). Los tireIds vienen del summary
+        // (matching por brand+model+size que hace bulkInsertTires).
+        if (supplierName.trim() && result.tireIds && result.tireIds.length > 0) {
+          try {
+            const tireIdByRow = new Map(result.tireIds.map(t => [t.rowIndex, t.tireId]));
+            const items = validResults.map((r, idx) => ({
+              rawSku: r.parsed!.sku,
+              rawSize: r.parsed!.size,
+              rawBrand: r.parsed!.brand,
+              rawModel: r.parsed!.model,
+              costOriginal: r.parsed!.cost,
+              priceSuggested: r.parsed!.price,
+              tireId: tireIdByRow.get(idx),
+            }));
+            const snap = await supplierPriceListService.importList({
+              supplierName: supplierName.trim(),
+              listName: `${supplierName.trim()} ${listDate}`,
+              currency: 'ARS',
+              effectiveDate: listDate,
+              notes: listNotes.trim() || undefined,
+              items,
+            });
+            setSnapshotInfo({ listId: snap.listId, matched: snap.matched });
+          } catch (snapErr) {
+            // El snapshot es secundario: si falla no rompemos el import principal.
+            // eslint-disable-next-line no-console
+            console.error('[ImportModal] snapshot lista proveedor falló:', snapErr);
+          }
+        }
       } else {
         const valid = customerResults.filter(r => r.parsed && !r.error).map(r => r.parsed!);
         result = await bulkInsertCustomers(valid);
@@ -135,6 +180,53 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
                 : 'Tipo: "minorista" o "mayorista". Si no se especifica PIN, se omite. Cupo en pesos.'}
             </p>
           </div>
+
+          {kind === 'tires' && (
+            <div className="rounded-lg p-3 space-y-2"
+                 style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--br-txt2)' }}>
+                Lista de proveedor <span className="font-normal">(opcional — para histórico de costos)</span>
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="text-xs" style={{ color: 'var(--br-txt2)' }}>Proveedor</span>
+                  <input
+                    type="text"
+                    value={supplierName}
+                    onChange={e => setSupplierName(e.target.value)}
+                    placeholder="ej: BULL VIAL"
+                    className="w-full px-2 py-1.5 text-sm rounded"
+                    style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}
+                  />
+                </label>
+                <label className="block">
+                  <span className="text-xs" style={{ color: 'var(--br-txt2)' }}>Fecha de la lista</span>
+                  <input
+                    type="date"
+                    value={listDate}
+                    onChange={e => setListDate(e.target.value)}
+                    className="w-full px-2 py-1.5 text-sm rounded"
+                    style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}
+                  />
+                </label>
+              </div>
+              <label className="block">
+                <span className="text-xs" style={{ color: 'var(--br-txt2)' }}>Notas</span>
+                <input
+                  type="text"
+                  value={listNotes}
+                  onChange={e => setListNotes(e.target.value)}
+                  placeholder="ej: Lista mayo 2026, recibida por mail"
+                  className="w-full px-2 py-1.5 text-sm rounded"
+                  style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}
+                />
+              </label>
+              <p className="text-xs" style={{ color: 'var(--br-txt2)' }}>
+                Si completás el proveedor, además del catálogo se guarda un snapshot con la fecha
+                para ver la evolución de costos en cada neumático.
+              </p>
+            </div>
+          )}
 
           <input
             ref={fileRef}
@@ -279,6 +371,12 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
               <span className="font-semibold" style={{ color: 'var(--br-grn)' }}>{summary.inserted}</span> insertadas
               {summary.failed > 0 && <> · <span className="font-semibold" style={{ color: 'var(--br-red)' }}>{summary.failed}</span> con errores</>}
             </p>
+            {snapshotInfo && (
+              <p className="text-xs mt-2" style={{ color: 'var(--br-txt2)' }}>
+                Snapshot guardado en histórico: <span className="font-mono">{snapshotInfo.matched}</span> items
+                vinculados a su neumático.
+              </p>
+            )}
           </div>
 
           {summary.errors.length > 0 && (

@@ -123,6 +123,12 @@ export interface ImportSummary {
   inserted: number;
   failed: number;
   errors: { rowIndex: number; error: string }[];
+  /**
+   * (Solo tires) mapping rowIndex → tireId persistido. Permite al caller
+   * crear un snapshot de lista de proveedor (`supplier_price_lists`) con
+   * los tire_id ya matcheados, sin re-hacer la búsqueda.
+   */
+  tireIds?: { rowIndex: number; tireId: string }[];
 }
 
 /**
@@ -135,7 +141,7 @@ export async function bulkInsertTires(
   categories: Category[],
 ): Promise<ImportSummary> {
   const catByName = new Map(categories.map(c => [normalize(c.name), c.id]));
-  const summary: ImportSummary = { inserted: 0, failed: 0, errors: [] };
+  const summary: ImportSummary = { inserted: 0, failed: 0, errors: [], tireIds: [] };
 
   // Cargar tires existentes para detectar duplicados (por brand+model+size case-insensitive).
   // Paginar: con >1000 tires, un select plano devuelve solo los primeros 1000 y
@@ -207,6 +213,7 @@ export async function bulkInsertTires(
       if (ovErr) throw ovErr;
 
       summary.inserted++;
+      summary.tireIds!.push({ rowIndex: i, tireId });
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error(`[import tires] fila ${i + 1}:`, e);
