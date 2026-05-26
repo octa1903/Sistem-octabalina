@@ -1,8 +1,22 @@
 import { supabase } from './supabaseClient';
 import { ensureNoError, rowToCamel, camelToRow, stripUndefined } from './supabaseHelpers';
-import type { Store } from '@/types';
+import type { Store, FiscalIdentity } from '@/types';
+import type { Json } from '@/types/database';
 
 const TABLE = 'stores';
+
+export function validateFiscalIdentity(fi: Partial<FiscalIdentity>): string[] {
+  const errors: string[] = [];
+  if (!fi.razonSocial?.trim()) errors.push('Razón social es requerida.');
+  if (!fi.cuit?.trim()) errors.push('CUIT es requerido.');
+  else if (!/^\d{2}-?\d{8}-?\d{1}$|^\d{11}$/.test(fi.cuit.replace(/[\s-]/g, ''))) {
+    errors.push('CUIT inválido (formato esperado: 11 dígitos o XX-XXXXXXXX-X).');
+  }
+  if (fi.inicioActiv && !/^\d{4}-\d{2}-\d{2}$/.test(fi.inicioActiv)) {
+    errors.push('Fecha de inicio inválida (YYYY-MM-DD).');
+  }
+  return errors;
+}
 
 export const storeService = {
   async getAll(): Promise<Store[]> {
@@ -54,5 +68,23 @@ export const storeService = {
   async delete(id: string): Promise<void> {
     const { error } = await supabase.from(TABLE).delete().eq('id', id);
     if (error) throw error;
+  },
+
+  /**
+   * Actualiza solo el `fiscal_identity` jsonb sin tocar otras columnas.
+   * Valida antes de escribir.
+   */
+  async updateFiscalIdentity(storeId: string, fi: FiscalIdentity): Promise<Store> {
+    const errors = validateFiscalIdentity(fi);
+    if (errors.length > 0) {
+      throw new Error(errors.join(' '));
+    }
+    const { data, error } = await supabase
+      .from(TABLE)
+      .update({ fiscal_identity: fi as unknown as Json })
+      .eq('id', storeId)
+      .select()
+      .single();
+    return rowToCamel<Store>(ensureNoError(data, error, 'storeService.updateFiscalIdentity'));
   },
 };

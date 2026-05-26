@@ -23,6 +23,7 @@ import { TopBar } from './TopBar';
 import { OpenCashModal } from './cash/OpenCashModal';
 import { CloseCashModal } from './cash/CloseCashModal';
 import { EmployeeSelector } from './EmployeeSelector';
+import { FirstRunWizard, needsFirstRunSetup } from './FirstRunWizard';
 
 type AuthReturn = ReturnType<typeof useAuth>;
 interface Props { auth: AuthReturn; }
@@ -241,6 +242,18 @@ export function EmployeeApp({ auth }: Props) {
             if (r.ok) addToast('Operador identificado.', 'success');
             else addToast(r.reason, 'error');
           }}
+        />
+      )}
+
+      {/* First run: si la tienda activa no tiene identidad fiscal mínima y el operador
+          puede gestionar settings, bloquear con wizard hasta completarla. */}
+      {stores.activeStore
+        && needsFirstRunSetup(stores.activeStore)
+        && hasPermission(current.employee?.role ?? null, 'settings.manage') && (
+        <FirstRunWizard
+          store={stores.activeStore}
+          addToast={addToast}
+          onCompleted={() => { void stores.refresh(); }}
         />
       )}
 

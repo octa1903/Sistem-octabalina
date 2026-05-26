@@ -10,6 +10,7 @@ import { TaxesSection } from './settings/TaxesSection';
 import { DiscountsSection } from './settings/DiscountsSection';
 import { LoyaltySection } from './settings/LoyaltySection';
 import { ReceiptConfigSection } from './settings/ReceiptConfigSection';
+import { StoreIdentitySection } from './settings/StoreIdentitySection';
 import { EmployeesSection } from './settings/EmployeesSection';
 import { RolesSection } from './settings/RolesSection';
 import { SalespeopleSection } from './settings/SalespeopleSection';
@@ -168,6 +169,13 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
 
       {/* Loyalty */}
       <LoyaltySection addToast={addToast} />
+
+      {/* Store fiscal identity */}
+      <StoreIdentitySection
+        storeId={activeStoreId ?? null}
+        storeName={activeStoreName ?? 'Tienda'}
+        addToast={addToast}
+      />
 
       {/* Receipt config */}
       <ReceiptConfigSection
