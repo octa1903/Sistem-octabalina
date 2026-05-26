@@ -5,17 +5,62 @@ import type { Json } from '@/types/database';
 
 const TABLE = 'stores';
 
-export function validateFiscalIdentity(fi: Partial<FiscalIdentity>): string[] {
-  const errors: string[] = [];
-  if (!fi.razonSocial?.trim()) errors.push('Razón social es requerida.');
-  if (!fi.cuit?.trim()) errors.push('CUIT es requerido.');
-  else if (!/^\d{2}-?\d{8}-?\d{1}$|^\d{11}$/.test(fi.cuit.replace(/[\s-]/g, ''))) {
-    errors.push('CUIT inválido (formato esperado: 11 dígitos o XX-XXXXXXXX-X).');
+export const IVA_OPTIONS = [
+  'Responsable Inscripto',
+  'Monotributo',
+  'Exento',
+  'Consumidor Final',
+  'No Responsable',
+] as const;
+
+export const EMPTY_FISCAL_IDENTITY: FiscalIdentity = {
+  razonSocial: '',
+  cuit: '',
+  iibb: '',
+  inicioActiv: '',
+  dirTel: '',
+  localidad: '',
+  ivaCondition: 'Responsable Inscripto',
+};
+
+export type FiscalErrors = Partial<Record<keyof FiscalIdentity, string>>;
+
+export function validateFiscalIdentity(fi: Partial<FiscalIdentity>): FiscalErrors {
+  const errors: FiscalErrors = {};
+  if (!fi.razonSocial?.trim()) {
+    errors.razonSocial = 'Razón social es requerida.';
+  }
+  if (!fi.cuit?.trim()) {
+    errors.cuit = 'CUIT es requerido.';
+  } else if (!/^\d{2}-?\d{8}-?\d{1}$|^\d{11}$/.test(fi.cuit.replace(/[\s-]/g, ''))) {
+    errors.cuit = 'CUIT inválido (formato XX-XXXXXXXX-X).';
   }
   if (fi.inicioActiv && !/^\d{4}-\d{2}-\d{2}$/.test(fi.inicioActiv)) {
-    errors.push('Fecha de inicio inválida (YYYY-MM-DD).');
+    errors.inicioActiv = 'Fecha inválida (YYYY-MM-DD).';
   }
   return errors;
+}
+
+export function hasErrors(e: FiscalErrors): boolean {
+  return Object.keys(e).length > 0;
+}
+
+/**
+ * Normaliza un CUIT a `XX-XXXXXXXX-X`. Devuelve el input tal cual si no tiene 11 dígitos.
+ * Idempotente con input ya formateado.
+ */
+export function formatCuit(raw: string): string {
+  const digits = raw.replace(/[\s-]/g, '');
+  if (!/^\d{11}$/.test(digits)) return raw;
+  return `${digits.slice(0, 2)}-${digits.slice(2, 10)}-${digits.slice(10)}`;
+}
+
+/** True cuando la tienda todavía no tiene identidad fiscal mínima (razón social + CUIT). */
+export function needsFirstRunSetup(store: Store | null | undefined): boolean {
+  if (!store) return false;
+  const fi = store.fiscalIdentity;
+  if (!fi) return true;
+  return !fi.razonSocial?.trim() || !fi.cuit?.trim();
 }
 
 export const storeService = {
@@ -76,8 +121,8 @@ export const storeService = {
    */
   async updateFiscalIdentity(storeId: string, fi: FiscalIdentity): Promise<Store> {
     const errors = validateFiscalIdentity(fi);
-    if (errors.length > 0) {
-      throw new Error(errors.join(' '));
+    if (hasErrors(errors)) {
+      throw new Error(Object.values(errors).join(' '));
     }
     const { data, error } = await supabase
       .from(TABLE)

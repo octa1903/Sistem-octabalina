@@ -23,7 +23,8 @@ import { TopBar } from './TopBar';
 import { OpenCashModal } from './cash/OpenCashModal';
 import { CloseCashModal } from './cash/CloseCashModal';
 import { EmployeeSelector } from './EmployeeSelector';
-import { FirstRunWizard, needsFirstRunSetup } from './FirstRunWizard';
+import { FirstRunWizard } from './FirstRunWizard';
+import { needsFirstRunSetup } from '@/services/storeService';
 
 type AuthReturn = ReturnType<typeof useAuth>;
 interface Props { auth: AuthReturn; }
