@@ -8,6 +8,9 @@
 .DS_Store
 Thumbs.db
 
+# Salvaguarda: la app vive en "Sistema Gomeria/" — npm install en la raíz es un error.
+/node_modules/
+
 # Salvaguarda: estas carpetas viven en ~/octab-tools/ (ver docs/REPO-LAYOUT.md).
 # Si vuelven a aparecer en la raíz, no las trackeamos.
 tools/
