@@ -29,7 +29,7 @@ describe('hashPin / verifyPin', () => {
   });
 
   it('verifyPin acepta hash legacy SHA-256 hex (backward-compat)', async () => {
-    // PIN "1234" → SHA-256 conocido (mismo que está en initialData.json)
+    // PIN "1234" → SHA-256 conocido (formato legacy de empleados v1).
     const legacy = await sha256('1234');
     expect(legacy).toBe('03ac674216f3e15c761ee1a5e255f067953623c8b388b4459e13f978d7c846f4');
     expect(await verifyPin('1234', legacy)).toBe(true);
