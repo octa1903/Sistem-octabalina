@@ -5,11 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#c47b12" />
     <!-- Content Security Policy: aplica al bundle single-file servido en producción.
+         script-src 'unsafe-inline' es obligatorio porque vite-plugin-singlefile inlinea todo el JS.
          connect-src cubre Supabase (auth + REST + realtime websockets).
-         style-src 'unsafe-inline' es necesario para Tailwind 4 inline styles. -->
+         style-src 'unsafe-inline' es necesario para Tailwind 4 inline styles.
+         frame-ancestors va en header HTTP via vercel.json (X-Frame-Options: DENY). -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.sheetjs.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+      content="default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://cdn.sheetjs.com; base-uri 'self'; form-action 'self'"
     />
     <title>Baliña Ruedas</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
