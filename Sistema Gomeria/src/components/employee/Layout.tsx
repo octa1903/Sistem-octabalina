@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { useStores } from '@/hooks/useStores';
 import { useCashSession } from '@/hooks/useCashSession';
+import { sessionReportServiceV2 } from '@/services/sessionReportServiceV2';
+import { printSessionReport } from '@/utils/printSessionReport';
 import { useCurrentEmployee } from '@/hooks/useCurrentEmployee';
 import { hasPermission } from '@/services/roleService';
 import { InventoryView } from './InventoryView';
@@ -53,6 +55,7 @@ export function EmployeeApp({ auth }: Props) {
   const [tab, setTab] = useState<EmployeeTab>('pos');
   const [openCashOpen, setOpenCashOpen] = useState(false);
   const [closingSession, setClosingSession] = useState<CashSession | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
   const { toasts, addToast, removeToast } = useToast();
 
   const stores = useStores(auth.isAuthenticated);
@@ -83,6 +86,22 @@ export function EmployeeApp({ auth }: Props) {
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error abriendo caja', 'error');
       throw e;
+    }
+  }
+
+  async function handleReport() {
+    if (!cash.session) {
+      addToast('No hay sesión de caja activa', 'warning');
+      return;
+    }
+    setReportLoading(true);
+    try {
+      const report = await sessionReportServiceV2.forSession(cash.session.id);
+      printSessionReport(report);
+    } catch (e) {
+      addToast(e instanceof Error ? e.message : 'Error generando reporte', 'error');
+    } finally {
+      setReportLoading(false);
     }
   }
 
@@ -180,6 +199,8 @@ export function EmployeeApp({ auth }: Props) {
           cashLoading={cash.loading || stores.loading}
           onOpenCash={() => setOpenCashOpen(true)}
           onCloseCash={() => { if (cash.session) setClosingSession(cash.session); }}
+          onReport={cash.session ? () => { void handleReport(); } : undefined}
+          reportLoading={reportLoading}
           employeeName={operatorName}
           canOpenCash={hasPermission(current.employee?.role ?? null, 'pos.openCash')}
           canCloseCash={hasPermission(current.employee?.role ?? null, 'pos.closeCash')}

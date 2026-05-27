@@ -1,5 +1,5 @@
 import type { Store, CashSession } from '@/types';
-import { Store as StoreIcon, LockOpen, Lock } from 'lucide-react';
+import { Store as StoreIcon, LockOpen, Lock, FileText } from 'lucide-react';
 import { formatCurrency } from '@/utils/currency';
 import { Button } from '@/components/ui';
 
@@ -11,6 +11,9 @@ interface Props {
   cashLoading: boolean;
   onOpenCash: () => void;
   onCloseCash: () => void;
+  /** Imprime un reporte X (sesión abierta) o Z (sesión cerrada). */
+  onReport?: () => void;
+  reportLoading?: boolean;
   employeeName?: string;
   canOpenCash: boolean;
   canCloseCash: boolean;
@@ -24,6 +27,8 @@ export function TopBar({
   cashLoading,
   onOpenCash,
   onCloseCash,
+  onReport,
+  reportLoading,
   employeeName,
   canOpenCash,
   canCloseCash,
@@ -73,6 +78,19 @@ export function TopBar({
               <LockOpen className="h-3 w-3" />
               Caja abierta · {formatCurrency(session.openingFloat)}
             </span>
+            {onReport && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onReport}
+                loading={reportLoading}
+                disabled={!activeStoreId}
+                iconLeft={<FileText className="h-3.5 w-3.5" />}
+                title="Imprimir reporte X (preview)"
+              >
+                Reporte X
+              </Button>
+            )}
             {canCloseCash && (
               <Button variant="danger" size="sm" onClick={onCloseCash} disabled={!activeStoreId}>
                 Cerrar caja

@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Modal } from '@/components/ui/Modal';
 import { Button, FormField, Input } from '@/components/ui';
 import { formatCurrency } from '@/utils/currency';
-import { Lock } from 'lucide-react';
+import { Lock, Printer } from 'lucide-react';
 import type { CloseResult } from '@/hooks/useCashSession';
 import type { CashSession } from '@/types';
+import { sessionReportServiceV2 } from '@/services/sessionReportServiceV2';
+import { printSessionReport } from '@/utils/printSessionReport';
 
 interface Props {
   open: boolean;
@@ -19,6 +21,19 @@ export function CloseCashModal({ open, session, storeName, onClose, onConfirm }:
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<CloseResult | null>(null);
+  const [printing, setPrinting] = useState(false);
+
+  async function handlePrintZ() {
+    setPrinting(true);
+    try {
+      const report = await sessionReportServiceV2.forSession(session.id);
+      printSessionReport(report);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error generando reporte Z.');
+    } finally {
+      setPrinting(false);
+    }
+  }
 
   const parsed = Number(amount);
   const valid = !isNaN(parsed) && parsed >= 0;
@@ -89,7 +104,18 @@ export function CloseCashModal({ open, session, storeName, onClose, onConfirm }:
                 : 'Hay más efectivo del esperado (sobrante).'}
             </p>
           )}
-          <div className="flex justify-end pt-1">
+          <div className="flex justify-end gap-2 pt-1">
+            <Button
+              type="button"
+              variant="secondary"
+              loading={printing}
+              iconLeft={<Printer className="h-4 w-4" />}
+              onClick={() => {
+                void handlePrintZ();
+              }}
+            >
+              Imprimir Z
+            </Button>
             <Button type="button" variant="primary" onClick={handleFinish}>
               Listo
             </Button>
