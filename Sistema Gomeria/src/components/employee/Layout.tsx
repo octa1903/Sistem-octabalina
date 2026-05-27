@@ -11,6 +11,8 @@ import { useStores } from '@/hooks/useStores';
 import { useCashSession } from '@/hooks/useCashSession';
 import { sessionReportServiceV2 } from '@/services/sessionReportServiceV2';
 import { printSessionReport } from '@/utils/printSessionReport';
+import { useOfflineQueue } from '@/hooks/useOfflineQueue';
+import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { useCurrentEmployee } from '@/hooks/useCurrentEmployee';
 import { hasPermission } from '@/services/roleService';
 import { InventoryView } from './InventoryView';
@@ -64,6 +66,7 @@ export function EmployeeApp({ auth }: Props) {
   const operatorName = current.employee?.name ?? auth.employeeName;
   const cash = useCashSession(stores.activeStoreId, operatorId);
   const adminCheck = useAdminBootstrapCheck(stores.activeStoreId);
+  const offlineState = useOfflineQueue();
 
   const activeStoreName = stores.activeStore?.name ?? 'Sin tienda';
 
@@ -191,6 +194,7 @@ export function EmployeeApp({ auth }: Props) {
 
       {/* Main column */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        <OfflineBanner state={offlineState} />
         <TopBar
           stores={stores.stores}
           activeStoreId={stores.activeStoreId}
