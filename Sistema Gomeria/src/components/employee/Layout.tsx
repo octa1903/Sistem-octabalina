@@ -6,6 +6,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import {
   ShoppingCart, Package, Users, CreditCard,
   FileText, ClipboardList, BarChart2, Settings, LogOut, UserCog,
+  Truck, Banknote,
 } from 'lucide-react';
 import { useStores } from '@/hooks/useStores';
 import { useCashSession } from '@/hooks/useCashSession';
@@ -19,6 +20,8 @@ import { InventoryView } from './InventoryView';
 import { POSView } from './POSView';
 import { ClientsView } from './ClientsView';
 import { AccountsView } from './AccountsView';
+import { SuppliersView } from './SuppliersView';
+import { ChecksView } from './ChecksView';
 import { InvoicesView } from './InvoicesView';
 import { OrdersView } from './OrdersView';
 import { AnalyticsView } from './AnalyticsView';
@@ -47,6 +50,8 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'inventory', label: 'Inventario', Icon: Package,        requires: 'tires.view' },
   { id: 'clients',   label: 'Clientes',   Icon: Users,          requires: 'customers.view' },
   { id: 'accounts',  label: 'Cuentas',    Icon: CreditCard,     requires: 'customers.view' },
+  { id: 'suppliers', label: 'Proveedores', Icon: Truck,         requires: 'backoffice.access' },
+  { id: 'checks',    label: 'Cheques',    Icon: Banknote,       requires: 'backoffice.access' },
   { id: 'invoices',  label: 'Facturas',   Icon: FileText,       requires: 'backoffice.access' },
   { id: 'orders',    label: 'Pedidos',    Icon: ClipboardList,  requires: 'backoffice.access' },
   { id: 'analytics', label: 'Análisis',   Icon: BarChart2,      requires: 'reports.view' },
@@ -234,6 +239,8 @@ export function EmployeeApp({ auth }: Props) {
               {tab === 'inventory' && <InventoryView addToast={addToast} activeStoreId={stores.activeStoreId} />}
               {tab === 'clients'   && <ClientsView   addToast={addToast} />}
               {tab === 'accounts'  && <AccountsView  addToast={addToast} employeeId={operatorId} />}
+              {tab === 'suppliers' && <SuppliersView addToast={addToast} />}
+              {tab === 'checks'    && <ChecksView    addToast={addToast} />}
               {tab === 'invoices'  && <InvoicesView  addToast={addToast} />}
               {tab === 'orders'    && <OrdersView    addToast={addToast} storeId={stores.activeStoreId} />}
               {tab === 'analytics' && <AnalyticsView storeId={stores.activeStoreId} />}

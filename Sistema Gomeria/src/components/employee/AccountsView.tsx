@@ -280,13 +280,19 @@ export function AccountsView({ addToast, employeeId }: Props) {
                       border: `1px solid ${active ? 'var(--br-amb-bor)' : 'var(--br-bor)'}`,
                     }}
                   >
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="font-medium text-sm truncate" style={{ color: 'var(--br-txt)' }}>{c.name}</p>
-                      {c.legacyId && (
-                        <span className="text-[10px] font-mono opacity-50 shrink-0" style={{ color: 'var(--br-txt2)' }}>
-                          #{c.legacyId}
-                        </span>
-                      )}
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium text-sm truncate" style={{ color: 'var(--br-txt)' }}>
+                        {c.name}
+                        {c.legacyId && (
+                          <span
+                            className="ml-2 text-[10px] px-1.5 py-0.5 rounded uppercase tracking-wide font-semibold"
+                            style={{ background: 'var(--br-amb-bg)', color: 'var(--br-amb)' }}
+                            title={`Importado del sistema legacy (#${c.legacyId})`}
+                          >
+                            Importado
+                          </span>
+                        )}
+                      </p>
                     </div>
                     <p
                       className="text-sm font-mono tabular-nums font-semibold mt-0.5"

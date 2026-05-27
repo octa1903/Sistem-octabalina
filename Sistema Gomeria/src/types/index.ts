@@ -811,6 +811,8 @@ export type EmployeeTab =
   | 'inventory'
   | 'clients'
   | 'accounts'
+  | 'suppliers'
+  | 'checks'
   | 'invoices'
   | 'orders'
   | 'analytics'
