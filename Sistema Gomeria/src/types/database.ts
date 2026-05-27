@@ -2092,12 +2092,16 @@ export type Database = {
           default_price: number
           id: string
           image_url: string | null
+          load_speed_index: string | null
           model: string
           modifier_group_ids: string[]
           notes: string | null
+          ply_rating: string | null
           size: string
+          size_alt: string | null
           sku: string | null
           tax_ids: string[]
+          tube_type: string | null
           updated_at: string
         }
         Insert: {
@@ -2111,12 +2115,16 @@ export type Database = {
           default_price?: number
           id?: string
           image_url?: string | null
+          load_speed_index?: string | null
           model: string
           modifier_group_ids?: string[]
           notes?: string | null
+          ply_rating?: string | null
           size: string
+          size_alt?: string | null
           sku?: string | null
           tax_ids?: string[]
+          tube_type?: string | null
           updated_at?: string
         }
         Update: {
@@ -2130,12 +2138,16 @@ export type Database = {
           default_price?: number
           id?: string
           image_url?: string | null
+          load_speed_index?: string | null
           model?: string
           modifier_group_ids?: string[]
           notes?: string | null
+          ply_rating?: string | null
           size?: string
+          size_alt?: string | null
           sku?: string | null
           tax_ids?: string[]
+          tube_type?: string | null
           updated_at?: string
         }
         Relationships: [
