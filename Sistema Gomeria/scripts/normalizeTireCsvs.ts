@@ -169,6 +169,9 @@ export function classifyCategory(size: string, description: string): string {
 
 // ── Marca: extracción / normalización ────────────────────────────────
 
+// Solo marcas REALES. FASTWAY/ECOLOGY/ENZO/FORZA/BRUTUS NO van acá —
+// son modelos de XBRI (ver scripts/fixTireData.ts para el catálogo
+// completo). MILEVER sí es marca real (china).
 const BRAND_PATTERNS: Array<{ regex: RegExp; brand: string }> = [
   { regex: /\bARMOUR\b/i, brand: 'ARMOUR' },
   { regex: /\bMRL\b/i, brand: 'MRL' },
@@ -177,12 +180,18 @@ const BRAND_PATTERNS: Array<{ regex: RegExp; brand: string }> = [
   { regex: /\bMARCHER\b|^MR-/i, brand: 'MARCHER' },
   { regex: /\bSAILUN\b/i, brand: 'SAILUN' },
   { regex: /\bKAPSEN\b/i, brand: 'KAPSEN' },
-  { regex: /\bFASTWAY\b/i, brand: 'FASTWAY' },
   { regex: /\bMILEVER\b/i, brand: 'MILEVER' },
-  { regex: /\bECOLOGY\b/i, brand: 'ECOLOGY' },
-  { regex: /\bBRUTUS\b/i, brand: 'BRUTUS' },
-  { regex: /\bFORZA\b/i, brand: 'FORZA' },
-  { regex: /\bENZO\b/i, brand: 'ENZO' },
+];
+
+// Modelos que XBRI revende bajo su listado pero NO son marcas
+// independientes. Si aparecen sin XBRI explícito en la descripción,
+// igual son modelos de XBRI.
+const XBRI_MODEL_PATTERNS: RegExp[] = [
+  /\bFASTWAY\b/i,
+  /\bECOLOGY\b/i,
+  /\bENZO\b/i,
+  /\bFORZA\b/i,
+  /\bBRUTUS\b/i,
 ];
 
 function extractBrandFromDescription(desc: string, fallback: string): string {
@@ -478,10 +487,28 @@ function parseXbri(rows: string[][]): StagingRow[] {
       if (alt) size = `${alt[2]} R${alt[1]}`;
     }
     if (!size) continue;
-    const brand = extractBrandFromDescription(modelTail || desc, 'XBRI');
+    // El listado XBRI revende marcas chinas reales (MILEVER, KAPSEN, etc.)
+    // Y también incluye sus propios modelos (FASTWAY, ECOLOGY, ENZO, FORZA,
+    // BRUTUS). Regla:
+    //   - Si la descripción matchea una marca china real → esa es la brand.
+    //   - Si matchea un modelo XBRI conocido → brand=XBRI, modelo el nombre.
+    //   - Sino → brand=XBRI (default), modelo = lo que quedó tras la medida.
+    const realBrand = extractBrandFromDescription(modelTail || desc, '');
+    let marca: string;
+    let modelo: string;
+    if (realBrand) {
+      marca = realBrand;
+      modelo = modelTail || realBrand;
+    } else if (XBRI_MODEL_PATTERNS.some(re => re.test(modelTail || desc))) {
+      marca = 'XBRI';
+      modelo = modelTail || 'XBRI';
+    } else {
+      marca = 'XBRI';
+      modelo = modelTail || 'XBRI';
+    }
     out.push({
-      marca: brand,
-      modelo: modelTail || 'XBRI',
+      marca,
+      modelo,
       medida: size,
       categoria: classifyCategory(size, desc),
       costo: 0,
