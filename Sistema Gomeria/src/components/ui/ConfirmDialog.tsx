@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react';
 import { Modal } from './Modal';
+import { useStableCallback } from '@/hooks/useStableCallback';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -47,18 +48,19 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   const Icon = iconMap[type];
   const palette = tokenMap[type];
+  const stableOnConfirm = useStableCallback(onConfirm);
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Enter' && !inputField) {
         e.preventDefault();
-        onConfirm();
+        stableOnConfirm();
       }
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, inputField, onConfirm]);
+  }, [open, inputField, stableOnConfirm]);
 
   return (
     <Modal open={open} onClose={onClose} size="sm" closeOnOverlay={type !== 'danger'}>

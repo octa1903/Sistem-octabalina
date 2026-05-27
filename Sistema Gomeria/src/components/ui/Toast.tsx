@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, Info, X } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { useStableCallback } from '@/hooks/useStableCallback';
 
 interface ToastProps {
   message: string;
@@ -27,14 +28,15 @@ export function Toast({ message, type = 'info', onClose, duration = 4000 }: Toas
   const [visible, setVisible] = useState(true);
   const Icon = icons[type];
   const palette = styleMap[type];
+  const stableOnClose = useStableCallback(onClose);
 
   useEffect(() => {
     const timer = setTimeout(() => {
       setVisible(false);
-      setTimeout(onClose, 300);
+      setTimeout(stableOnClose, 300);
     }, duration);
     return () => clearTimeout(timer);
-  }, [duration, onClose]);
+  }, [duration, stableOnClose]);
 
   return (
     <div

@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/utils/cn';
+import { useStableCallback } from '@/hooks/useStableCallback';
 
 interface ModalProps {
   open: boolean;
@@ -24,16 +25,16 @@ export function Modal({
 }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const stableOnClose = useStableCallback(onClose);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && open) onClose();
+      if (e.key === 'Escape' && open) stableOnClose();
     };
     document.addEventListener('keydown', handleEsc);
     if (open) {
       document.body.style.overflow = 'hidden';
       const previouslyFocused = document.activeElement as HTMLElement | null;
-      // Mover foco al primer elemento focusable dentro del modal.
       requestAnimationFrame(() => {
         const focusable = dialogRef.current?.querySelector<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
@@ -47,7 +48,7 @@ export function Modal({
       };
     }
     return () => document.removeEventListener('keydown', handleEsc);
-  }, [open, onClose]);
+  }, [open, stableOnClose]);
 
   if (!open) return null;
 
