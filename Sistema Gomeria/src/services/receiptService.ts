@@ -266,7 +266,7 @@ export const receiptService = {
       p_lines: linesPayload as unknown as never,
     });
     if (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('[receipt] create error:', error);
       throw new Error(error.message);
     }

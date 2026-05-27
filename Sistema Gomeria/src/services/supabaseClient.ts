@@ -6,7 +6,7 @@ const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!url || !anonKey) {
   // En dev mostramos un mensaje claro; en producción dejamos crashear el cliente.
-  // eslint-disable-next-line no-console
+   
   console.error(
     '[supabase] Faltan VITE_SUPABASE_URL o VITE_SUPABASE_ANON_KEY. ' +
     'Copiá .env.example a .env y completá los valores.'

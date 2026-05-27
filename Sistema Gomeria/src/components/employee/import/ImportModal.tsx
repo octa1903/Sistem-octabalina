@@ -128,7 +128,7 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
             setSnapshotInfo({ listId: snap.listId, matched: snap.matched });
           } catch (snapErr) {
             // El snapshot es secundario: si falla no rompemos el import principal.
-            // eslint-disable-next-line no-console
+             
             console.error('[ImportModal] snapshot lista proveedor falló:', snapErr);
           }
         }

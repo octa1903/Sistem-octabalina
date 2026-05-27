@@ -15,7 +15,7 @@ export function ensureNoError<T>(
   context: string,
 ): T {
   if (error) {
-    // eslint-disable-next-line no-console
+     
     console.error(`[supabase] ${context}:`, error.code, error.message, error.hint ?? '');
     throw new Error(`${context}: ${error.message}`);
   }
@@ -130,7 +130,7 @@ export async function fetchAllPaginated<T>(
     const to = from + PAGE_SIZE - 1;
     const { data, error } = await buildQuery().range(from, to);
     if (error) {
-      // eslint-disable-next-line no-console
+       
       console.error(`[supabase paginate] ${context}:`, error.code, error.message, error.hint ?? '');
       throw new Error(`${context}: ${error.message}`);
     }
@@ -154,7 +154,7 @@ export async function fetchAllPaginated<T>(
 // Cuando regen-types reescriba `database.ts` con las funciones, este
 // helper sigue funcionando idéntico pero ya queda redundante para
 // las RPCs cubiertas.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+ 
 const untypedRpc = supabase.rpc as unknown as (
   fn: string,
   args?: Record<string, unknown>,
@@ -167,7 +167,7 @@ export async function callUntypedRpc<T>(
 ): Promise<T> {
   const { data, error } = await untypedRpc(fn, args);
   if (error) {
-    // eslint-disable-next-line no-console
+     
     console.error(`[supabase rpc] ${context}:`, error.code, error.message, error.hint ?? '');
     throw new Error(`${context}: ${error.message}`);
   }

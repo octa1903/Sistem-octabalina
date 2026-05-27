@@ -86,7 +86,7 @@ export const cashSessionService = {
       p_counted_cash: input.countedCash,
     });
     if (error) {
-      // eslint-disable-next-line no-console
+       
       console.error('[cashSession] close error:', error);
       throw new Error(error.message);
     }

@@ -84,7 +84,7 @@ export function useAuth() {
           sessionSet('auth_session', null);
         }
       } catch (e) {
-        // eslint-disable-next-line no-console
+         
         console.error('[useAuth] hydrate error', e);
       }
     })();

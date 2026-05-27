@@ -80,7 +80,7 @@ function pickField<T = unknown>(row: RawRow, aliases: string[]): T | undefined {
 function asNumber(v: unknown): number {
   if (typeof v === 'number') return v;
   if (typeof v === 'string') {
-    const cleaned = v.replace(/\./g, '').replace(',', '.').replace(/[^\d.\-]/g, '');
+    const cleaned = v.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
     const n = parseFloat(cleaned);
     return isNaN(n) ? 0 : n;
   }
@@ -215,7 +215,7 @@ export async function bulkInsertTires(
       summary.inserted++;
       summary.tireIds!.push({ rowIndex: i, tireId });
     } catch (e) {
-      // eslint-disable-next-line no-console
+       
       console.error(`[import tires] fila ${i + 1}:`, e);
       summary.failed++;
       summary.errors.push({ rowIndex: i, error: describeError(e) });
@@ -299,7 +299,7 @@ export async function bulkInsertCustomers(parsed: CustomerImportRow[]): Promise<
       if (error) throw error;
       summary.inserted++;
     } catch (e) {
-      // eslint-disable-next-line no-console
+       
       console.error(`[import customers] fila ${i + 1}:`, e);
       summary.failed++;
       summary.errors.push({ rowIndex: i, error: describeError(e) });
