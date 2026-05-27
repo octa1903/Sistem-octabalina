@@ -12,6 +12,7 @@ import { LoyaltySection } from './settings/LoyaltySection';
 import { ReceiptConfigSection } from './settings/ReceiptConfigSection';
 import { StoreIdentitySection } from './settings/StoreIdentitySection';
 import { EmployeesSection } from './settings/EmployeesSection';
+import { BackupSection } from './settings/BackupSection';
 import { RolesSection } from './settings/RolesSection';
 import { SalespeopleSection } from './settings/SalespeopleSection';
 import { InsuranceCompaniesSection } from './settings/InsuranceCompaniesSection';
@@ -214,10 +215,13 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
         </div>
       </Section>
 
-      {/* Backup */}
-      <Section title="Respaldo de datos">
+      {/* Backup completo Supabase (recomendado) */}
+      <BackupSection addToast={addToast} />
+
+      {/* Backup local legacy (solo localStorage — útil para PINs/config previa migración) */}
+      <Section title="Respaldo local (legacy)">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          {label('Exportar / Importar', 'Guardá una copia de todos los datos o restaurá desde un backup.')}
+          {label('Exportar / Importar localStorage', 'Solo respalda configuración local (no toca Supabase). Usá esto si moviste datos legacy.')}
           <div className="flex gap-2">
             <Button variant="secondary" iconLeft={<Download className="h-4 w-4" />} onClick={exportBackup}>
               Exportar
