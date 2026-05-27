@@ -56,11 +56,20 @@ export function formatCuit(raw: string): string {
 }
 
 /** True cuando la tienda todavía no tiene identidad fiscal mínima (razón social + CUIT). */
-export function needsFirstRunSetup(store: Store | null | undefined): boolean {
+export function needsFiscalSetup(store: Store | null | undefined): boolean {
   if (!store) return false;
   const fi = store.fiscalIdentity;
   if (!fi) return true;
   return !fi.razonSocial?.trim() || !fi.cuit?.trim();
+}
+
+/**
+ * Alias retrocompatible. Hoy es equivalente a `needsFiscalSetup`, pero ahora
+ * el wizard incluye otros pasos (bootstrap admin) que se evalúan aparte —
+ * ver `FirstRunWizard` y `needsAdminBootstrap` en employeeService.
+ */
+export function needsFirstRunSetup(store: Store | null | undefined): boolean {
+  return needsFiscalSetup(store);
 }
 
 export const storeService = {

@@ -68,4 +68,41 @@ export const employeeService = {
     const { error } = await supabase.from(TABLE).update({ active }).eq('id', id);
     if (error) throw error;
   },
+
+  /**
+   * Cuenta empleados activos en la tienda dada que tengan al menos uno de
+   * los permisos requeridos (típicamente `settings.manage` para el bootstrap).
+   *
+   * Se hace en cliente porque no hay tabla `employees_with_perms` y unir
+   * `roles` requiere un JOIN que igual paginaríamos. La cantidad de
+   * empleados por tienda es chica (<50) — el costo es despreciable.
+   */
+  async countActiveWithPermission(
+    storeId: string,
+    permission: string,
+  ): Promise<number> {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select('store_ids, role:roles(permissions)')
+      .eq('active', true);
+    if (error) throw error;
+    type Row = { store_ids: string[] | null; role: { permissions: string[] } | null };
+    const rows = (data ?? []) as Row[];
+    return rows.filter(
+      (r) =>
+        (r.store_ids === null || r.store_ids.includes(storeId)) &&
+        r.role?.permissions.includes(permission),
+    ).length;
+  },
 };
+
+/**
+ * True cuando una tienda NO tiene ningún empleado activo con `settings.manage`,
+ * lo que dejaría al sistema imposible de operar (nadie puede entrar a Configuración
+ * para crear empleados). El wizard de first-run usa este check para forzar
+ * la creación de un admin inicial.
+ */
+export async function needsAdminBootstrap(storeId: string): Promise<boolean> {
+  const count = await employeeService.countActiveWithPermission(storeId, 'settings.manage');
+  return count === 0;
+}

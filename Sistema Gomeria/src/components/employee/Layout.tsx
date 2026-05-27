@@ -24,7 +24,8 @@ import { OpenCashModal } from './cash/OpenCashModal';
 import { CloseCashModal } from './cash/CloseCashModal';
 import { EmployeeSelector } from './EmployeeSelector';
 import { FirstRunWizard } from './FirstRunWizard';
-import { needsFirstRunSetup } from '@/services/storeService';
+import { needsFiscalSetup } from '@/services/storeService';
+import { useAdminBootstrapCheck } from '@/hooks/useAdminBootstrapCheck';
 
 type AuthReturn = ReturnType<typeof useAuth>;
 interface Props { auth: AuthReturn; }
@@ -59,6 +60,7 @@ export function EmployeeApp({ auth }: Props) {
   const operatorId = current.employee?.id ?? auth.employeeId ?? null;
   const operatorName = current.employee?.name ?? auth.employeeName;
   const cash = useCashSession(stores.activeStoreId, operatorId);
+  const adminCheck = useAdminBootstrapCheck(stores.activeStoreId);
 
   const activeStoreName = stores.activeStore?.name ?? 'Sin tienda';
 
@@ -246,17 +248,33 @@ export function EmployeeApp({ auth }: Props) {
         />
       )}
 
-      {/* First run: si la tienda activa no tiene identidad fiscal mínima y el operador
-          puede gestionar settings, bloquear con wizard hasta completarla. */}
-      {stores.activeStore
-        && needsFirstRunSetup(stores.activeStore)
-        && hasPermission(current.employee?.role ?? null, 'settings.manage') && (
-        <FirstRunWizard
-          store={stores.activeStore}
-          addToast={addToast}
-          onCompleted={() => { void stores.refresh(); }}
-        />
-      )}
+      {/* First run: bloquea con wizard mientras falte algo crítico:
+          (a) identidad fiscal mínima en la tienda activa, o
+          (b) ningún empleado con `settings.manage` (bootstrap admin).
+          Caso (b) NO requiere permiso (justamente no hay nadie con permiso).
+          Caso (a) sí requiere permiso porque el operador podría no ser admin. */}
+      {stores.activeStore && (() => {
+        const fiscalPending = needsFiscalSetup(stores.activeStore);
+        const adminPending = adminCheck.needsAdmin === true;
+        if (!fiscalPending && !adminPending) return null;
+        // Si solo falta fiscal y el operador actual no es admin, no mostramos
+        // el wizard (el admin lo verá cuando entre). Pero si falta el bootstrap
+        // admin, lo mostramos siempre — es el caso "no hay admin todavía".
+        if (fiscalPending && !adminPending && !hasPermission(current.employee?.role ?? null, 'settings.manage')) {
+          return null;
+        }
+        return (
+          <FirstRunWizard
+            store={stores.activeStore}
+            needsAdmin={adminPending}
+            addToast={addToast}
+            onCompleted={() => {
+              void stores.refresh();
+              adminCheck.recheck();
+            }}
+          />
+        );
+      })()}
 
       {/* Toasts */}
       {toasts.map((t) => (
