@@ -54,6 +54,7 @@ export function TopBar({
           <select
             value={activeStoreId ?? ''}
             onChange={(e) => onSelectStore(e.target.value)}
+            aria-label="Tienda activa"
             className="text-sm font-semibold px-2 py-1 rounded-lg outline-none"
             style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
           >

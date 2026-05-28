@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { Modal } from '@/components/ui/Modal';
+import { Button, Spinner } from '@/components/ui';
 import { Upload, Download, FileText, AlertTriangle, CheckCircle } from 'lucide-react';
 import {
   parseFile, validateTireRows, validateCustomerRows,
@@ -340,24 +341,21 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
           )}
 
           <div className="flex justify-end gap-2">
-            <button onClick={() => setStage('pick')} className="px-4 py-2 rounded-lg text-sm" style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}>
+            <Button variant="secondary" onClick={() => setStage('pick')}>
               Cambiar archivo
-            </button>
-            <button
-              onClick={doImport}
-              disabled={validCount === 0}
-              className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-              style={{ background: 'var(--br-amb)' }}
-            >
+            </Button>
+            <Button variant="primary" onClick={doImport} disabled={validCount === 0}>
               Importar {validCount} {validCount === 1 ? 'fila' : 'filas'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
 
       {stage === 'importing' && (
-        <div className="py-8 text-center">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-stone-200 border-t-amber-500 mx-auto mb-3" />
+        <div className="py-8 text-center" role="status" aria-live="polite" aria-label={`Importando ${validCount} filas`}>
+          <div className="flex justify-center mb-3">
+            <Spinner size="lg" />
+          </div>
           <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>Importando {validCount} filas...</p>
         </div>
       )}
@@ -392,9 +390,9 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
           )}
 
           <div className="flex justify-end">
-            <button onClick={handleClose} className="px-4 py-2 rounded-lg text-sm font-semibold text-white" style={{ background: 'var(--br-dark)' }}>
+            <Button variant="primary" onClick={handleClose}>
               Listo
-            </button>
+            </Button>
           </div>
         </div>
       )}

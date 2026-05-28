@@ -11,7 +11,7 @@ import { roleService } from '@/services/roleService';
 import { storeService } from '@/services/storeService';
 import { hashPin } from '@/utils/hash';
 import { Modal } from '@/components/ui/Modal';
-import { IconButton } from '@/components/ui';
+import { Button, IconButton, SectionHeader } from '@/components/ui';
 import { UserPlus, Edit2, Users, Power, KeyRound } from 'lucide-react';
 
 interface Props {
@@ -179,19 +179,15 @@ export function EmployeesSection({ addToast }: Props) {
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-      <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-        <div className="flex items-center gap-2">
-          <Users className="h-5 w-5" style={{ color: 'var(--br-amb)' }} />
-          <h2 className="font-semibold" style={{ color: 'var(--br-txt)' }}>Empleados</h2>
-        </div>
-        <button
-          onClick={openNew}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white"
-          style={{ background: 'var(--br-amb)' }}
-        >
-          <UserPlus className="h-4 w-4" /> Nuevo empleado
-        </button>
-      </div>
+      <SectionHeader
+        icon={<Users className="h-5 w-5" />}
+        title="Empleados"
+        action={
+          <Button variant="primary" size="sm" iconLeft={<UserPlus className="h-4 w-4" />} onClick={openNew}>
+            Nuevo empleado
+          </Button>
+        }
+      />
 
       <div>
         {loading ? (
@@ -335,7 +331,7 @@ export function EmployeesSection({ addToast }: Props) {
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold"
                 style={{
                   background: form.storeIds === null ? 'var(--br-amb)' : 'var(--br-sur2)',
-                  color: form.storeIds === null ? '#fff' : 'var(--br-txt2)',
+                  color: form.storeIds === null ? 'var(--br-sur)' : 'var(--br-txt2)',
                   border: '1px solid var(--br-bor)',
                 }}
               >
@@ -348,7 +344,7 @@ export function EmployeesSection({ addToast }: Props) {
                 className="text-xs px-3 py-1.5 rounded-lg font-semibold"
                 style={{
                   background: form.storeIds !== null ? 'var(--br-amb)' : 'var(--br-sur2)',
-                  color: form.storeIds !== null ? '#fff' : 'var(--br-txt2)',
+                  color: form.storeIds !== null ? 'var(--br-sur)' : 'var(--br-txt2)',
                   border: '1px solid var(--br-bor)',
                 }}
               >
@@ -421,22 +417,12 @@ export function EmployeesSection({ addToast }: Props) {
         </div>
 
         <div className="flex justify-end gap-2 mt-5">
-          <button
-            onClick={() => setModalOpen(false)}
-            disabled={submitting}
-            className="px-4 py-2 rounded-lg text-sm disabled:opacity-50"
-            style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt2)' }}
-          >
+          <Button variant="secondary" onClick={() => setModalOpen(false)} disabled={submitting}>
             Cancelar
-          </button>
-          <button
-            onClick={save}
-            disabled={submitting}
-            className="px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-            style={{ background: 'var(--br-amb)' }}
-          >
-            {submitting ? 'Guardando...' : 'Guardar'}
-          </button>
+          </Button>
+          <Button variant="primary" onClick={save} loading={submitting} disabled={submitting}>
+            Guardar
+          </Button>
         </div>
       </Modal>
     </div>

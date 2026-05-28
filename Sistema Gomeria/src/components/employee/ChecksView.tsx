@@ -109,15 +109,16 @@ export function ChecksView({ addToast }: Props) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
+      <div role="group" aria-label="Filtrar cheques" className="flex items-center gap-2 flex-wrap">
         {filterTabs.map((f) => (
           <button
             key={f.id}
             onClick={() => setFilter(f.id)}
+            aria-pressed={filter === f.id}
             className="px-3 py-1.5 rounded-lg text-xs font-medium"
             style={{
               background: filter === f.id ? 'var(--br-amb)' : 'var(--br-sur)',
-              color: filter === f.id ? '#fff' : 'var(--br-txt)',
+              color: filter === f.id ? 'var(--br-sur)' : 'var(--br-txt)',
               border: '1px solid var(--br-bor)',
             }}
           >
@@ -129,6 +130,7 @@ export function ChecksView({ addToast }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por número o titular..."
+            aria-label="Buscar cheque por número o titular"
             iconLeft={<Search className="h-4 w-4" />}
           />
         </div>

@@ -122,7 +122,7 @@ export function ClientsView({ addToast }: Props) {
       await customerServiceV2.delete(deleting.id);
       await refresh();
       setDeleting(null);
-      addToast('Cliente eliminado.', 'warning');
+      addToast('Cliente eliminado.', 'success');
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error eliminando cliente.', 'error');
     }
@@ -153,6 +153,7 @@ export function ClientsView({ addToast }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre, teléfono..."
+            aria-label="Buscar cliente por nombre o teléfono"
             iconLeft={<Search className="h-4 w-4" />}
           />
         </div>

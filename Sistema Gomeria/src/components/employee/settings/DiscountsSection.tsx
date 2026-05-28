@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { Discount } from '@/types';
 import { discountService } from '@/services/discountService';
 import { Modal } from '@/components/ui/Modal';
-import { Button, IconButton } from '@/components/ui';
+import { Button, IconButton, SectionHeader } from '@/components/ui';
 import { Plus, Edit2, Trash2, Tag } from 'lucide-react';
 
 interface Props {
@@ -109,19 +109,15 @@ export function DiscountsSection({ addToast }: Props) {
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-      <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-        <div className="flex items-center gap-2">
-          <Tag className="h-5 w-5" style={{ color: 'var(--br-amb)' }} />
-          <h2 className="font-semibold" style={{ color: 'var(--br-txt)' }}>Descuentos</h2>
-        </div>
-        <button
-          onClick={openNew}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-white"
-          style={{ background: 'var(--br-amb)' }}
-        >
-          <Plus className="h-4 w-4" /> Nuevo descuento
-        </button>
-      </div>
+      <SectionHeader
+        icon={<Tag className="h-5 w-5" />}
+        title="Descuentos"
+        action={
+          <Button variant="primary" size="sm" iconLeft={<Plus className="h-4 w-4" />} onClick={openNew}>
+            Nuevo descuento
+          </Button>
+        }
+      />
 
       <div>
         {loading ? (

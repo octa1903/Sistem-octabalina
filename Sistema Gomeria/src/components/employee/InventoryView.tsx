@@ -217,7 +217,7 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
       await tireServiceV2.delete(deleting.id);  // overrides cascadean por FK
       await refresh();
       setDeleting(null);
-      addToast('Neumático eliminado.', 'warning');
+      addToast('Neumático eliminado.', 'success');
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error eliminando.', 'error');
     }
@@ -290,6 +290,7 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar marca, modelo, medida..."
+            aria-label="Buscar neumático por marca, modelo o medida"
             iconLeft={<Search className="h-4 w-4" />}
           />
         </div>

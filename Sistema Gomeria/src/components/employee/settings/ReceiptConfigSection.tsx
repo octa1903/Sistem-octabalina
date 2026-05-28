@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { ReceiptConfig } from '@/types';
 import { receiptConfigService } from '@/services/receiptConfigService';
 import { Receipt as ReceiptIcon, Save } from 'lucide-react';
+import { Button } from '@/components/ui';
 
 interface Props {
   storeId: string | null;
@@ -107,14 +108,15 @@ export function ReceiptConfigSection({ storeId, storeName, addToast }: Props) {
             </label>
 
             <div className="flex justify-end">
-              <button
+              <Button
+                variant="primary"
+                iconLeft={<Save className="h-4 w-4" />}
                 onClick={save}
+                loading={saving}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white disabled:opacity-50"
-                style={{ background: 'var(--br-amb)' }}
               >
-                <Save className="h-4 w-4" /> {saving ? 'Guardando...' : 'Guardar'}
-              </button>
+                Guardar
+              </Button>
             </div>
           </>
         )}

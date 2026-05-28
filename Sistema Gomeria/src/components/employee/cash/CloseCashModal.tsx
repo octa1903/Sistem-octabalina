@@ -92,8 +92,8 @@ export function CloseCashModal({ open, session, storeName, onClose, onConfirm }:
             <div className="flex justify-between text-sm font-semibold pt-1.5" style={{ borderTop: '1px solid var(--br-bor)' }}>
               <span style={{ color: 'var(--br-txt2)' }}>Descuadre</span>
               <span className="font-mono"
-                    style={{ color: result.variance === 0 ? 'var(--br-grn)' : result.variance > 0 ? 'var(--br-amb)' : 'var(--br-red)' }}>
-                {result.variance > 0 ? '+' : ''}{formatCurrency(result.variance)}
+                    style={{ color: result.variance === 0 ? 'var(--br-grn)' : result.variance > 0 ? 'var(--br-red)' : 'var(--br-amb)' }}>
+                {result.variance > 0 ? '-' : result.variance < 0 ? '+' : ''}{formatCurrency(Math.abs(result.variance))}
               </span>
             </div>
           </div>

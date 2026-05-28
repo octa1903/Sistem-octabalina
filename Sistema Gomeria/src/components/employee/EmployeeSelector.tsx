@@ -64,11 +64,14 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
       style={{ background: 'rgba(28, 24, 20, 0.85)' }}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="employee-selector-title"
         className="w-full max-w-sm rounded-2xl shadow-xl overflow-hidden"
         style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
       >
         <div className="px-6 py-4" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-          <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--br-txt)' }}>
+          <h2 id="employee-selector-title" className="text-lg font-semibold flex items-center gap-2" style={{ color: 'var(--br-txt)' }}>
             <User className="h-5 w-5" style={{ color: 'var(--br-amb)' }} />
             ¿Quién va a operar el TPV?
           </h2>
@@ -95,7 +98,7 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
                     key={emp.id}
                     type="button"
                     onClick={() => setSelectedId(emp.id)}
-                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-stone-50 transition-colors"
+                    className="w-full text-left px-3 py-2.5 text-sm hover:bg-[var(--br-sur2)] transition-colors"
                     style={{ borderBottom: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}
                   >
                     <span className="font-medium">{emp.name}</span>

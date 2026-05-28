@@ -149,15 +149,16 @@ export function SuppliersView({ addToast }: Props) {
         </div>
       </div>
 
-      <div className="flex items-center gap-2 flex-wrap">
+      <div role="group" aria-label="Filtrar proveedores" className="flex items-center gap-2 flex-wrap">
         {(['debt', 'credit', 'all'] as Filter[]).map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
+            aria-pressed={filter === f}
             className="px-3 py-1.5 rounded-lg text-xs font-medium"
             style={{
               background: filter === f ? 'var(--br-amb)' : 'var(--br-sur)',
-              color: filter === f ? '#fff' : 'var(--br-txt)',
+              color: filter === f ? 'var(--br-sur)' : 'var(--br-txt)',
               border: '1px solid var(--br-bor)',
             }}
           >
@@ -169,6 +170,7 @@ export function SuppliersView({ addToast }: Props) {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por nombre o CUIT..."
+            aria-label="Buscar proveedor por nombre o CUIT"
             iconLeft={<Search className="h-4 w-4" />}
           />
         </div>

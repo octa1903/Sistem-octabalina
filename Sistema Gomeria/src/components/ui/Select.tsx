@@ -7,10 +7,13 @@ export interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   sizeVariant?: 'sm' | 'md' | 'lg';
 }
 
+// md = 48px (touch target POS). Coherente con Input/Button.
+// sm = 40px solo para tablas backoffice.
+// lg = 56px para acciones críticas.
 const sizeClasses = {
-  sm: 'h-8 text-xs pr-8',
-  md: 'h-10 text-sm pr-9',
-  lg: 'h-12 text-base pr-10',
+  sm: 'h-10 text-sm pr-9',
+  md: 'h-12 text-base pr-10',
+  lg: 'h-14 text-base pr-10',
 };
 
 export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select(

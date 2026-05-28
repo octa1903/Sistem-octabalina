@@ -165,7 +165,6 @@ export function EmployeeApp({ auth }: Props) {
                 style={{
                   color: active ? 'var(--br-amb)' : 'var(--br-dark-txt2)',
                   background: active ? 'var(--br-dark-amb-bg)' : 'transparent',
-                  borderLeft: active ? '3px solid var(--br-amb)' : '3px solid transparent',
                 }}
               >
                 <Icon className="h-5 w-5 flex-shrink-0" aria-hidden="true" />

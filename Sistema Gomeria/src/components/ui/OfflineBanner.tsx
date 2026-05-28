@@ -18,7 +18,7 @@ export function OfflineBanner({ state }: Props) {
   if (online && pending === 0 && !flushing) return null;
 
   const bg = !online ? 'var(--br-amb)' : flushing ? 'var(--br-amb-bg)' : 'var(--br-grn-bg)';
-  const fg = !online ? '#fff' : 'var(--br-txt)';
+  const fg = !online ? 'var(--br-sur)' : 'var(--br-txt)';
 
   const Icon = !online ? WifiOff : flushing ? RefreshCw : AlertCircle;
 
@@ -40,7 +40,7 @@ export function OfflineBanner({ state }: Props) {
       role="status"
       aria-live="polite"
       className="flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium"
-      style={{ background: bg, color: fg, borderBottom: '1px solid rgba(0,0,0,0.1)' }}
+      style={{ background: bg, color: fg, borderBottom: '1px solid var(--br-bor)' }}
     >
       <Icon className={`h-4 w-4 flex-shrink-0 ${flushing ? 'animate-spin' : ''}`} aria-hidden="true" />
       <span>{message}</span>

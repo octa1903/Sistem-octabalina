@@ -9,3 +9,4 @@ export { FormField } from './FormField';
 export { Select, type SelectProps } from './Select';
 export { EmptyState } from './EmptyState';
 export { IconButton, type IconButtonProps } from './IconButton';
+export { SectionHeader } from './SectionHeader';

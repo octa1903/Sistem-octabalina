@@ -9,10 +9,13 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   sizeVariant?: 'sm' | 'md' | 'lg';
 }
 
+// md = 48px (touch target POS, WCAG/Loyverse mínimo 44px). NO bajar.
+// sm = 40px solo para tablas backoffice de alta densidad (NO usar en flow táctil).
+// lg = 56px para acciones críticas (apertura/cierre de caja, montos).
 const sizeClasses = {
-  sm: 'h-8 text-xs',
-  md: 'h-10 text-sm',
-  lg: 'h-12 text-base',
+  sm: 'h-10 text-sm',
+  md: 'h-12 text-base',
+  lg: 'h-14 text-base',
 };
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(

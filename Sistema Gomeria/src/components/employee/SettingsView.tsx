@@ -273,11 +273,13 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
             {label('Habilitar pedidos online', 'Permite que los clientes hagan pedidos desde su acceso.')}
             <button
               onClick={() => setOrderConfig((p) => ({ ...p, enabled: !p.enabled }))}
+              aria-pressed={orderConfig.enabled}
+              aria-label={`Pedidos online: ${orderConfig.enabled ? 'habilitados' : 'deshabilitados'}`}
               style={{ color: orderConfig.enabled ? 'var(--br-grn)' : 'var(--br-txt2)' }}
             >
               {orderConfig.enabled
-                ? <ToggleRight className="h-8 w-8" />
-                : <ToggleLeft className="h-8 w-8" />}
+                ? <ToggleRight className="h-8 w-8" aria-hidden="true" />
+                : <ToggleLeft className="h-8 w-8" aria-hidden="true" />}
             </button>
           </div>
 
@@ -293,7 +295,7 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
                   className="w-11 py-1.5 rounded-lg text-sm font-semibold transition-colors"
                   style={{
                     background: orderConfig.workDays[i] ? 'var(--br-amb)' : 'var(--br-sur2)',
-                    color: orderConfig.workDays[i] ? '#fff' : 'var(--br-txt2)',
+                    color: orderConfig.workDays[i] ? 'var(--br-sur)' : 'var(--br-txt2)',
                     border: '1px solid var(--br-bor)',
                   }}>
                   {d}

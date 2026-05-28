@@ -217,7 +217,7 @@ export function AccountsView({ addToast, employeeId }: Props) {
             </span>
           </div>
         </div>
-        <div role="tablist" aria-label="Filtrar cuentas" className="flex gap-2">
+        <div role="group" aria-label="Filtrar cuentas" className="flex gap-2">
           {tabBtn('debt', 'Con deuda', summary.debtorCount)}
           {tabBtn('credit', 'A favor', summary.creditorCount)}
           {tabBtn('all', 'Todos')}
@@ -233,6 +233,7 @@ export function AccountsView({ addToast, employeeId }: Props) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={filter === 'all' ? 'Buscar cliente (requerido)...' : 'Filtrar por nombre o teléfono...'}
+              aria-label="Buscar cliente en cuentas corrientes"
               iconLeft={<Search className="h-4 w-4" />}
             />
           </div>
