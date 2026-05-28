@@ -2,7 +2,7 @@ import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 
-type Variant = 'primary' | 'secondary' | 'danger' | 'success' | 'ghost';
+type Variant = 'primary' | 'secondary' | 'danger' | 'success' | 'info' | 'ghost';
 type Size = 'sm' | 'md' | 'lg';
 
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -45,6 +45,10 @@ const variantStyles: Record<Variant, { className: string; style?: React.CSSPrope
   success: {
     className: 'text-white shadow-sm hover:opacity-90 active:opacity-80',
     style: { background: 'var(--br-grn)' },
+  },
+  info: {
+    className: 'text-white shadow-sm hover:opacity-90 active:opacity-80',
+    style: { background: 'var(--br-info)' },
   },
   ghost: {
     className: 'hover:bg-[var(--br-sur2)]',

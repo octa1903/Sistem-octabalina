@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { useAuth } from '@/hooks/useAuth';
 import { customerServiceV2 } from '@/services/customerServiceV2';
 import { Eye, EyeOff, LogIn, Mail } from 'lucide-react';
+import { Button } from '@/components/ui';
 
 type AuthReturn = ReturnType<typeof useAuth>;
 
@@ -202,15 +203,16 @@ export function LoginScreen({ auth }: Props) {
                 </p>
               )}
 
-              <button
+              <Button
                 type="submit"
+                variant="primary"
+                fullWidth
                 disabled={loading || !email || !password}
-                className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--br-amb)] focus-visible:ring-offset-[var(--br-bg)]"
-                style={{ background: 'var(--br-dark)' }}
+                loading={loading}
+                iconLeft={<LogIn className="h-4 w-4" />}
               >
-                <LogIn className="h-4 w-4" aria-hidden="true" />
-                {loading ? 'Verificando...' : 'Ingresar como Empleado'}
-              </button>
+                Ingresar como Empleado
+              </Button>
             </form>
           )}
 
@@ -319,15 +321,16 @@ export function LoginScreen({ auth }: Props) {
               )}
 
               {selectedClientId && selectedClient?.hasPin && (
-                <button
+                <Button
                   type="submit"
+                  variant="primary"
+                  fullWidth
                   disabled={loading || !pin}
-                  className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[var(--br-amb)] focus-visible:ring-offset-[var(--br-bg)]"
-                  style={{ background: 'var(--br-dark)' }}
+                  loading={loading}
+                  iconLeft={<LogIn className="h-4 w-4" />}
                 >
-                  <LogIn className="h-4 w-4" aria-hidden="true" />
-                  {loading ? 'Verificando...' : 'Continuar →'}
-                </button>
+                  Continuar
+                </Button>
               )}
             </form>
           )}

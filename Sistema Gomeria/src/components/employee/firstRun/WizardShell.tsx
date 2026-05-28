@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { Building2 } from 'lucide-react';
 
 interface WizardShellProps {
@@ -12,6 +12,15 @@ interface WizardShellProps {
   footer: ReactNode;
 }
 
+const FOCUSABLE_SELECTOR = [
+  'a[href]:not([disabled])',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
+
 /**
  * Shell común del FirstRunWizard: header con título + indicador de pasos
  * + área de contenido scrollable + footer fijo con botones.
@@ -20,15 +29,50 @@ interface WizardShellProps {
  * tocar markup ni estilos.
  */
 export function WizardShell({ title, subtitle, steps, currentStep, children, footer }: WizardShellProps) {
+  const titleId = useId();
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  // Focus trap: bootstrap del primer arranque, no debe poder tabular fuera.
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+      const focusables = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+      if (focusables.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (!active || !dialogRef.current.contains(active)) {
+        e.preventDefault();
+        first.focus();
+        return;
+      }
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, []);
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="first-run-title"
+      aria-labelledby={titleId}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
       style={{ background: 'rgba(26, 24, 20, 0.45)' }}
     >
       <div
+        ref={dialogRef}
         className="w-full max-w-2xl overflow-hidden"
         style={{
           background: 'var(--br-sur)',
@@ -48,7 +92,7 @@ export function WizardShell({ title, subtitle, steps, currentStep, children, foo
             <Building2 className="h-5 w-5 text-white" aria-hidden="true" />
           </div>
           <div className="flex-1">
-            <h2 id="first-run-title" className="text-lg font-semibold" style={{ color: 'var(--br-txt)' }}>
+            <h2 id={titleId} className="text-lg font-semibold" style={{ color: 'var(--br-txt)' }}>
               {title}
             </h2>
             {subtitle && (
@@ -74,7 +118,7 @@ export function WizardShell({ title, subtitle, steps, currentStep, children, foo
                     className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-semibold"
                     style={{
                       background: done || active ? 'var(--br-amb)' : 'var(--br-bg)',
-                      color: done || active ? 'white' : 'var(--br-txt2)',
+                      color: done || active ? 'var(--br-sur)' : 'var(--br-txt2)',
                       border: `1px solid ${done || active ? 'var(--br-amb)' : 'var(--br-bor)'}`,
                     }}
                   >
