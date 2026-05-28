@@ -105,7 +105,7 @@ export function SalespeopleSection({ addToast, storeId }: Props) {
       await salespersonService.delete(deleting.id);
       await refresh();
       setDeleting(null);
-      addToast('Vendedor eliminado.', 'warning');
+      addToast('Vendedor eliminado.', 'success');
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error eliminando.', 'error');
     }

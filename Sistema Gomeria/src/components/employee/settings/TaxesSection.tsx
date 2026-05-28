@@ -94,7 +94,7 @@ export function TaxesSection({ addToast }: Props) {
       await taxService.delete(deleting.id);
       await refresh();
       setDeleting(null);
-      addToast('Impuesto eliminado.', 'warning');
+      addToast('Impuesto eliminado.', 'success');
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error eliminando.', 'error');
     }

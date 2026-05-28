@@ -138,7 +138,7 @@ export function InvoicesView({ addToast }: Props) {
       await supplierInvoiceService.delete(deleting.id);
       await refresh();
       setDeleting(null);
-      addToast('Factura eliminada.', 'warning');
+      addToast('Factura eliminada.', 'success');
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error eliminando.', 'error');
     }

@@ -101,7 +101,7 @@ export function DiscountsSection({ addToast }: Props) {
       await discountService.delete(deleting.id);
       await refresh();
       setDeleting(null);
-      addToast('Descuento eliminado.', 'warning');
+      addToast('Descuento eliminado.', 'success');
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error eliminando.', 'error');
     }

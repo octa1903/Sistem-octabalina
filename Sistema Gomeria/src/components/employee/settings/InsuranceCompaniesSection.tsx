@@ -100,7 +100,7 @@ export function InsuranceCompaniesSection({ addToast }: Props) {
       await insuranceCompanyService.delete(deleting.id);
       await refresh();
       setDeleting(null);
-      addToast('Aseguradora eliminada.', 'warning');
+      addToast('Aseguradora eliminada.', 'success');
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error eliminando.', 'error');
     }
