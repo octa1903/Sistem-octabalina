@@ -304,10 +304,19 @@ export function AnalyticsView({ storeId }: Props) {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 overflow-x-auto" style={{ borderBottom: '1px solid var(--br-bor)' }}>
+      <div
+        role="tablist"
+        aria-label="Secciones del informe"
+        className="flex gap-1 mb-4 overflow-x-auto"
+        style={{ borderBottom: '1px solid var(--br-bor)' }}
+      >
         {TABS.map(t => (
           <button
             key={t.id}
+            role="tab"
+            aria-selected={tab === t.id}
+            aria-controls={`analytics-panel-${t.id}`}
+            id={`analytics-tab-${t.id}`}
             onClick={() => setTab(t.id)}
             className="px-3 py-2 text-sm font-medium whitespace-nowrap"
             style={{
@@ -322,16 +331,34 @@ export function AnalyticsView({ storeId }: Props) {
       </div>
 
       {error && (
-        <div className="rounded-lg p-3 mb-4 text-sm" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}>
+        <div role="alert" className="rounded-lg p-3 mb-4 text-sm" style={{ background: 'var(--br-red-bg)', color: 'var(--br-red)', border: '1px solid var(--br-red-bor)' }}>
           {error}
         </div>
       )}
 
       {loading && (
-        <p className="text-sm py-2" style={{ color: 'var(--br-txt2)' }}>Cargando…</p>
+        <div
+          aria-busy="true"
+          aria-label="Cargando informe"
+          className="space-y-2"
+        >
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-lg h-10 motion-safe:animate-pulse"
+              style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)' }}
+            />
+          ))}
+        </div>
       )}
 
-      {/* Content */}
+      {/* Content (oculto durante loading para que el skeleton ocupe el lugar) */}
+      <div
+        role="tabpanel"
+        id={`analytics-panel-${tab}`}
+        aria-labelledby={`analytics-tab-${tab}`}
+        hidden={loading}
+      >
       {tab === 'summary'    && <SummaryPanel data={data.summary} />}
       {tab === 'items'      && <SimpleTable rows={data.items}      columns={ITEM_COLUMNS}     empty="Sin ventas en el período."     rowKey={r => r.tireId} />}
       {tab === 'categories' && <SimpleTable rows={data.categories} columns={CATEGORY_COLUMNS} empty="Sin ventas en el período."     rowKey={r => r.categoryId} />}
@@ -341,6 +368,7 @@ export function AnalyticsView({ storeId }: Props) {
       {tab === 'discounts'  && <SimpleTable rows={data.discounts}  columns={DISCOUNT_COLUMNS} empty="Sin descuentos aplicados."     rowKey={r => r.discountId} />}
       {tab === 'taxes'      && <SimpleTable rows={data.taxes}      columns={TAX_COLUMNS}      empty="Sin impuestos aplicados."      rowKey={r => r.taxId} />}
       {tab === 'cash'       && <SimpleTable rows={data.cash}       columns={CASH_COLUMNS}     empty="Sin sesiones de caja."         rowKey={r => r.id} />}
+      </div>
     </div>
   );
 }

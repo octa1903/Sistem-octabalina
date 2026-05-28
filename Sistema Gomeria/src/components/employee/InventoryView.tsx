@@ -329,11 +329,11 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
       {/* Table */}
       <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }}>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm" style={{ minWidth: 700 }}>
+          <table className="w-full text-sm" style={{ minWidth: 700 }} aria-label="Inventario de neumáticos">
             <thead>
               <tr style={{ background: 'var(--br-sur2)', borderBottom: '1px solid var(--br-bor)' }}>
                 {['Medida / Modelo', 'Marca', 'Categoría', 'Stock', 'Costo', 'Margen', 'Precio', 'Estado', ''].map((h) => (
-                  <th key={h} className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--br-txt2)' }}>{h}</th>
+                  <th key={h} scope="col" className="text-left px-4 py-3 text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--br-txt2)' }}>{h}</th>
                 ))}
               </tr>
             </thead>

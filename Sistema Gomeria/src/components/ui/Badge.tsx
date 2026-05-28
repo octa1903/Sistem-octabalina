@@ -12,11 +12,11 @@ export function Badge({ status, className, ariaLabel }: BadgeProps) {
   const label = STATUS_LABELS[status] || status;
   return (
     <span
-      role="status"
+      role="img"
       aria-label={ariaLabel ?? `Estado: ${label}`}
       className={cn(
         'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
-        STATUS_COLORS[status] || 'bg-gray-100 text-gray-700 border-gray-300',
+        STATUS_COLORS[status] || 'bg-[var(--br-sur2)] text-[var(--br-txt2)] border-[var(--br-bor)]',
         className,
       )}
     >

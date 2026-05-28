@@ -33,8 +33,18 @@ interface Props {
 
 const DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
 
+type SettingsTab = 'sales' | 'store' | 'people' | 'system';
+
+const TABS: { id: SettingsTab; label: string }[] = [
+  { id: 'sales', label: 'Ventas' },
+  { id: 'store', label: 'Tienda' },
+  { id: 'people', label: 'Personas' },
+  { id: 'system', label: 'Sistema' },
+];
+
 export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, currentRole }: Props) {
   const canManageEmployees = hasPermission(currentRole ?? null, 'employees.manage');
+  const [tab, setTab] = useState<SettingsTab>('sales');
   const [orderConfig, setOrderConfig] = useState<OrderConfig>({ ...DEFAULT_ORDER_CONFIG });
   const [wholesaleConfig, setWholesaleConfig] = useState<WholesaleConfig>({ ...DEFAULT_WHOLESALE_CONFIG });
   const [configLoading, setConfigLoading] = useState(true);
@@ -158,84 +168,11 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
     </div>
   );
 
-  return (
-    <div className="p-6 max-w-3xl mx-auto space-y-6">
-      <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Configuración</h1>
-
-      {/* Taxes */}
+  const salesPanel = (
+    <div className="space-y-6">
       <TaxesSection addToast={addToast} />
-
-      {/* Discounts */}
       <DiscountsSection addToast={addToast} />
-
-      {/* Loyalty */}
       <LoyaltySection addToast={addToast} />
-
-      {/* Store fiscal identity */}
-      <StoreIdentitySection
-        storeId={activeStoreId ?? null}
-        storeName={activeStoreName ?? 'Tienda'}
-        addToast={addToast}
-      />
-
-      {/* Receipt config */}
-      <ReceiptConfigSection
-        storeId={activeStoreId ?? null}
-        storeName={activeStoreName ?? 'Tienda'}
-        addToast={addToast}
-      />
-
-      {/* Empleados (solo con employees.manage) */}
-      {canManageEmployees && <EmployeesSection addToast={addToast} />}
-
-      {/* Roles: tope de descuento por rol (solo con employees.manage) */}
-      {canManageEmployees && (
-        <Section title="Roles · Tope de descuento">
-          <RolesSection addToast={addToast} />
-        </Section>
-      )}
-
-      {/* Vendedores (Fase 1.5) */}
-      <SalespeopleSection addToast={addToast} storeId={activeStoreId ?? null} />
-
-      {/* Aseguradoras (Fase 1.5) */}
-      <InsuranceCompaniesSection addToast={addToast} />
-
-      {/* Security */}
-      <Section title="Seguridad">
-        <div className="flex items-center justify-between">
-          {label('Contraseña de empleado', 'Cambiá la contraseña de acceso al sistema.')}
-          <Button
-            variant="secondary"
-            iconLeft={<Key className="h-4 w-4" />}
-            onClick={() => setPwdOpen(true)}
-          >
-            Cambiar contraseña
-          </Button>
-        </div>
-      </Section>
-
-      {/* Backup completo Supabase (recomendado) */}
-      <BackupSection addToast={addToast} />
-
-      {/* Backup local legacy (solo localStorage — útil para PINs/config previa migración) */}
-      <Section title="Respaldo local (legacy)">
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          {label('Exportar / Importar localStorage', 'Solo respalda configuración local (no toca Supabase). Usá esto si moviste datos legacy.')}
-          <div className="flex gap-2">
-            <Button variant="secondary" iconLeft={<Download className="h-4 w-4" />} onClick={exportBackup}>
-              Exportar
-            </Button>
-            <label className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-semibold cursor-pointer transition-colors hover:bg-[var(--br-sur2)]"
-              style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}>
-              <Upload className="h-4 w-4" /> Importar
-              <input type="file" accept=".json" className="hidden" onChange={importBackup} />
-            </label>
-          </div>
-        </div>
-      </Section>
-
-      {/* Wholesale */}
       <Section title="Configuración Mayorista">
         <div className="grid grid-cols-2 gap-4">
           {[
@@ -264,8 +201,21 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
           </Button>
         </div>
       </Section>
+    </div>
+  );
 
-      {/* Order config */}
+  const storePanel = (
+    <div className="space-y-6">
+      <StoreIdentitySection
+        storeId={activeStoreId ?? null}
+        storeName={activeStoreName ?? 'Tienda'}
+        addToast={addToast}
+      />
+      <ReceiptConfigSection
+        storeId={activeStoreId ?? null}
+        storeName={activeStoreName ?? 'Tienda'}
+        addToast={addToast}
+      />
       <Section title="Disponibilidad para Pedidos">
         <div className="space-y-4">
           {/* Enable toggle */}
@@ -364,6 +314,102 @@ export function SettingsView({ auth, addToast, activeStoreId, activeStoreName, c
           </Button>
         </div>
       </Section>
+    </div>
+  );
+
+  const peoplePanel = (
+    <div className="space-y-6">
+      {canManageEmployees && <EmployeesSection addToast={addToast} />}
+      {canManageEmployees && (
+        <Section title="Roles · Tope de descuento">
+          <RolesSection addToast={addToast} />
+        </Section>
+      )}
+      <SalespeopleSection addToast={addToast} storeId={activeStoreId ?? null} />
+      <InsuranceCompaniesSection addToast={addToast} />
+    </div>
+  );
+
+  const systemPanel = (
+    <div className="space-y-6">
+      <Section title="Seguridad">
+        <div className="flex items-center justify-between">
+          {label('Contraseña de empleado', 'Cambiá la contraseña de acceso al sistema.')}
+          <Button
+            variant="secondary"
+            iconLeft={<Key className="h-4 w-4" />}
+            onClick={() => setPwdOpen(true)}
+          >
+            Cambiar contraseña
+          </Button>
+        </div>
+      </Section>
+      <BackupSection addToast={addToast} />
+      <Section title="Respaldo local (legacy)">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          {label('Exportar / Importar localStorage', 'Solo respalda configuración local (no toca Supabase). Usá esto si moviste datos legacy.')}
+          <div className="flex gap-2">
+            <Button variant="secondary" iconLeft={<Download className="h-4 w-4" />} onClick={exportBackup}>
+              Exportar
+            </Button>
+            <label className="inline-flex items-center gap-2 h-10 px-4 rounded-lg text-sm font-semibold cursor-pointer transition-colors hover:bg-[var(--br-sur2)]"
+              style={{ border: '1px solid var(--br-bor)', color: 'var(--br-txt)', background: 'var(--br-sur)' }}>
+              <Upload className="h-4 w-4" /> Importar
+              <input type="file" accept=".json" className="hidden" onChange={importBackup} />
+            </label>
+          </div>
+        </div>
+      </Section>
+    </div>
+  );
+
+  const panels: Record<SettingsTab, React.ReactNode> = {
+    sales: salesPanel,
+    store: storePanel,
+    people: peoplePanel,
+    system: systemPanel,
+  };
+
+  return (
+    <div className="p-6 max-w-3xl mx-auto space-y-6">
+      <h1 className="text-xl font-semibold" style={{ color: 'var(--br-txt)' }}>Configuración</h1>
+
+      <div
+        role="tablist"
+        aria-label="Secciones de configuración"
+        className="flex gap-1 p-1 rounded-xl"
+        style={{ background: 'var(--br-sur2)', border: '1px solid var(--br-bor)' }}
+      >
+        {TABS.map((t) => {
+          const active = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={active}
+              aria-controls={`settings-panel-${t.id}`}
+              id={`settings-tab-${t.id}`}
+              onClick={() => setTab(t.id)}
+              className="flex-1 py-2 rounded-lg text-sm font-semibold transition-colors"
+              style={{
+                background: active ? 'var(--br-sur)' : 'transparent',
+                color: active ? 'var(--br-txt)' : 'var(--br-txt2)',
+                boxShadow: active ? 'var(--br-shadow-sm)' : 'none',
+              }}
+            >
+              {t.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <div
+        role="tabpanel"
+        id={`settings-panel-${tab}`}
+        aria-labelledby={`settings-tab-${tab}`}
+      >
+        {panels[tab]}
+      </div>
 
       {/* Change password modal */}
       <Modal open={pwdOpen} onClose={() => setPwdOpen(false)} title="Cambiar Contraseña Empleado" size="sm">
