@@ -4,7 +4,7 @@ import { customerServiceV2 } from '@/services/customerServiceV2';
 import { supabase } from '@/services/supabaseClient';
 import { ensureNoError, rowToCamel } from '@/services/supabaseHelpers';
 import { formatCurrency } from '@/utils/currency';
-import { Modal, Input, Button } from '@/components/ui';
+import { Modal, Input, Button, FormField, Select } from '@/components/ui';
 import { Search, Plus, Minus, TrendingUp, TrendingDown, Wallet } from 'lucide-react';
 
 interface Props {
@@ -438,31 +438,35 @@ export function AccountsView({ addToast, employeeId }: Props) {
 
       <Modal open={paymentOpen} onClose={() => !submitting && setPaymentOpen(false)} title={paymentType === 'charge' ? 'Registrar cargo' : 'Registrar pago'} size="sm">
         <div className="space-y-3">
-          <div>
-            <label htmlFor="account-payment-amount" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Monto ($)</label>
-            <input id="account-payment-amount" type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)}
-              placeholder="0" autoFocus
+          <FormField label="Monto ($)">
+            <Input
+              type="number"
+              min="0"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0"
+              autoFocus
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
-          </div>
-          <div>
-            <label htmlFor="account-payment-method" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Método</label>
-            <select id="account-payment-method" value={paymentMethodId} onChange={(e) => setPaymentMethodId(e.target.value)}
+            />
+          </FormField>
+          <FormField label="Método">
+            <Select
+              value={paymentMethodId}
+              onChange={(e) => setPaymentMethodId(e.target.value)}
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}>
+            >
               {paymentMethods.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="account-payment-notes" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>Notas</label>
-            <input id="account-payment-notes" type="text" value={notes} onChange={(e) => setNotes(e.target.value)}
+            </Select>
+          </FormField>
+          <FormField label="Notas">
+            <Input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               placeholder="Opcional..."
               disabled={submitting}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }} />
-          </div>
+            />
+          </FormField>
         </div>
         <div className="flex justify-end gap-2 mt-5">
           <Button variant="secondary" onClick={() => setPaymentOpen(false)} disabled={submitting}>Cancelar</Button>

@@ -7,7 +7,7 @@ import {
   EMPTY_FISCAL_IDENTITY,
   type FiscalErrors,
 } from '@/services/storeService';
-import { Button } from '@/components/ui';
+import { Button, SectionHeader } from '@/components/ui';
 import { Building2, Save } from 'lucide-react';
 import { FiscalIdentityForm } from './FiscalIdentityForm';
 
@@ -78,11 +78,11 @@ export function StoreIdentitySection({ storeId, storeName, addToast }: Props) {
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-      <div className="px-5 py-4 flex items-center gap-2" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-        <Building2 className="h-5 w-5" style={{ color: 'var(--br-amb)' }} />
-        <h2 className="font-semibold" style={{ color: 'var(--br-txt)' }}>Identidad fiscal del negocio</h2>
-        <span className="text-xs" style={{ color: 'var(--br-txt2)' }}>· {storeName}</span>
-      </div>
+      <SectionHeader
+        icon={<Building2 className="h-5 w-5" />}
+        title="Identidad fiscal del negocio"
+        subtitle={storeName}
+      />
 
       <div className="px-5 py-4">
         {loading ? (

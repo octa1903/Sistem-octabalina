@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { LoyaltyConfig } from '@/types';
 import { loyaltyConfigService } from '@/services/loyaltyConfigService';
 import { Star } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button, SectionHeader } from '@/components/ui';
 
 interface Props {
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
@@ -44,10 +44,7 @@ export function LoyaltySection({ addToast }: Props) {
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}>
-      <div className="px-5 py-4 flex items-center gap-2" style={{ borderBottom: '1px solid var(--br-bor)' }}>
-        <Star className="h-5 w-5" style={{ color: 'var(--br-amb)' }} />
-        <h2 className="font-semibold" style={{ color: 'var(--br-txt)' }}>Programa de lealtad</h2>
-      </div>
+      <SectionHeader icon={<Star className="h-5 w-5" />} title="Programa de lealtad" />
 
       <div className="p-5 space-y-4">
         {loading ? (

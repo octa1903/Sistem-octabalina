@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { AlertTriangle, Info, CheckCircle, XCircle } from 'lucide-react';
 import { Modal } from './Modal';
 import { Button } from './Button';
+import { Input } from './Input';
 import { useStableCallback } from '@/hooks/useStableCallback';
 
 const variantByType = {
@@ -87,26 +88,22 @@ export function ConfirmDialog({
         </p>
 
         {inputField && onInputChange && (
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => onInputChange(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                onConfirm(inputValue);
-              }
-            }}
-            placeholder={inputPlaceholder}
-            aria-label={inputPlaceholder ?? title}
-            className="mb-4 w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
-            style={{
-              border: '1px solid var(--br-bor)',
-              background: 'var(--br-sur)',
-              color: 'var(--br-txt)',
-            }}
-            autoFocus
-          />
+          <div className="mb-4">
+            <Input
+              type="text"
+              value={inputValue}
+              onChange={(e) => onInputChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  onConfirm(inputValue);
+                }
+              }}
+              placeholder={inputPlaceholder}
+              aria-label={inputPlaceholder ?? title}
+              autoFocus
+            />
+          </div>
         )}
 
         <div className="flex gap-3">

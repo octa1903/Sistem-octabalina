@@ -68,24 +68,28 @@
 
 ## Escala de spacing (Tailwind)
 
-Valores permitidos: `1, 2, 3, 4, 6, 8, 12` (= 4/8/12/16/24/32/48px a base 16px, proporcional).  
-Evitar: `5, 7, 10, 11, 13+` — rompen el ritmo visual.
+Valores permitidos: `1, 2, 3, 4, 5, 6, 8, 10, 12` (= 4/8/12/16/20/24/32/40/48px a base 16px, proporcional).
+Evitar: `7, 9, 11, 13+` — rompen el ritmo visual sin aportar beneficio.
+
+**Nota histórica (2026-05-27):** `5` y `10` originalmente estaban prohibidos, pero el uso real en headers de sección (`px-5 py-4`), footers de modal (`gap-2 mt-5`), y empty states (`py-10`) demostró que son útiles para spacing intermedio. Se incorporaron a la escala oficial tras la auditoría `/impeccable`.
 
 ## Componentes del design system (`src/components/ui/`)
 
 | Componente | Import | Variantes / Props |
 |---|---|---|
-| `Button` | `@/components/ui` | `variant: primary│secondary│danger│success│ghost`; `size: sm│md│lg`; `loading`; `iconLeft/Right`; `fullWidth` |
-| `Input` | `@/components/ui` | Wrapper de `<input>` con estilos de token |
-| `Select` | `@/components/ui` | Wrapper de `<select>` |
-| `FormField` | `@/components/ui` | Label + Input + error message |
-| `Modal` | `@/components/ui` | `open`, `onClose`, `title`, `size: sm│md│lg│xl` |
-| `ConfirmDialog` | `@/components/ui` | Modal de confirmación con acción destructiva |
+| `Button` | `@/components/ui` | `variant: primary│secondary│danger│success│info│ghost`; `size: sm│md│lg` (sm=40px, md=48px, lg=56px); `loading`; `iconLeft/Right`; `fullWidth` |
+| `Input` | `@/components/ui` | Wrapper de `<input>`. `sizeVariant: sm│md│lg` (sm=40px, md=48px default, lg=56px). `iconLeft/Right`, `error`, `hint` |
+| `Select` | `@/components/ui` | Wrapper de `<select>` con misma escala de sizes que Input |
+| `FormField` | `@/components/ui` | Label + Input + error message. Asocia `htmlFor`/`id` con `useId()`. |
+| `Modal` | `@/components/ui` | `open`, `onClose`, `title`, `size: sm│md│lg│xl`. Focus trap real (Tab cycling), ESC, restore focus |
+| `ConfirmDialog` | `@/components/ui` | Modal de confirmación con tipo `danger│warning│info│success` |
 | `IconButton` | `@/components/ui` | Botón solo con ícono (Lucide), accesible |
+| `SectionHeader` | `@/components/ui` | Header de sección con `icon`, `title`, `subtitle?`, `action?` |
 | `EmptyState` | `@/components/ui` | Estado vacío estandarizado |
-| `Badge` | `@/components/ui` | Etiqueta de estado/categoría |
+| `Badge` | `@/components/ui` | Etiqueta de estado/categoría. `role="img"` (no `status` para no spamear AT) |
 | `Spinner` | `@/components/ui` | Loading spinner |
 | `Toast` + `useToast` | `@/components/ui` | Notificaciones temporales |
+| `OfflineBanner` | `@/components/ui` | Banner sticky cuando hay ops pendientes en la cola offline |
 
 ## Reglas de diseño específicas del producto
 

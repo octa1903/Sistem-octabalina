@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Download, Database, AlertTriangle, CheckCircle2 } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button, SectionHeader } from '@/components/ui';
 import {
   supabaseBackupServiceV2,
   type BackupProgress,
@@ -77,15 +77,10 @@ export function BackupSection({ addToast }: Props) {
       className="rounded-xl overflow-hidden"
       style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)' }}
     >
-      <div
-        className="px-5 py-4 flex items-center gap-2"
-        style={{ borderBottom: '1px solid var(--br-bor)' }}
-      >
-        <Database className="h-5 w-5" style={{ color: 'var(--br-amb)' }} />
-        <h2 className="font-semibold" style={{ color: 'var(--br-txt)' }}>
-          Respaldo completo (Supabase)
-        </h2>
-      </div>
+      <SectionHeader
+        icon={<Database className="h-5 w-5" />}
+        title="Respaldo completo (Supabase)"
+      />
 
       <div className="px-5 py-4 space-y-3">
         <p className="text-sm" style={{ color: 'var(--br-txt2)' }}>

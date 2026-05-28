@@ -23,7 +23,7 @@ import { rollupTaxes } from '@/utils/rollupTaxes';
 import { CartPanel } from './pos/CartPanel';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
-import { Button, Select } from '@/components/ui';
+import { Button, Input, Select } from '@/components/ui';
 import { Search, Trash2, CheckCircle, Printer } from 'lucide-react';
 
 interface Props {
@@ -610,16 +610,14 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
 
         {/* Filters */}
         <div className="flex gap-2 mb-4 flex-wrap">
-          <div className="relative flex-1 min-w-48">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4" style={{ color: 'var(--br-txt2)' }} aria-hidden="true" />
-            <input
+          <div className="flex-1 min-w-48">
+            <Input
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar neumático..."
               aria-label="Buscar neumático por marca, modelo o medida"
-              className="w-full pl-9 pr-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)' }}
+              iconLeft={<Search className="h-4 w-4" />}
             />
           </div>
           <Select
@@ -834,7 +832,7 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
             <label htmlFor="pos-park-name" className="block text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--br-txt2)' }}>
               Nombre / Referencia
             </label>
-            <input
+            <Input
               id="pos-park-name"
               type="text"
               value={parkName}
@@ -842,8 +840,6 @@ export function POSView({ addToast, storeId, cashSession, employeeId, employeeNa
               placeholder="Ej: Camioneta blanca, Juan Pérez..."
               autoFocus
               maxLength={60}
-              className="w-full px-3 py-2 rounded-lg text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
-              style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
               onKeyDown={(e) => { if (e.key === 'Enter') void confirmPark(); }}
             />
           </div>

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { Employee } from '@/types';
 import { employeeService } from '@/services/employeeService';
 import { AlertCircle, LogIn, User } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button, Input } from '@/components/ui';
 
 const FOCUSABLE_SELECTOR = [
   'a[href]:not([disabled])',
@@ -170,7 +170,7 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
               <label className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
                 PIN
               </label>
-              <input
+              <Input
                 ref={pinInputRef}
                 type="password"
                 inputMode="numeric"
@@ -181,12 +181,7 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
                 placeholder="••••"
                 aria-invalid={error ? true : undefined}
                 aria-describedby={error ? 'pin-error' : undefined}
-                className="w-full px-3 py-2.5 rounded-lg text-sm outline-none text-center tracking-widest focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--br-amb)]"
-                style={{
-                  border: `1px solid ${error ? 'var(--br-red)' : 'var(--br-bor)'}`,
-                  background: 'var(--br-sur)',
-                  color: 'var(--br-txt)',
-                }}
+                className="text-center tracking-widest"
               />
             </div>
           )}

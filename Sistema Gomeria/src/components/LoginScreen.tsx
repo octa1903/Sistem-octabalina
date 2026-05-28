@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import type { useAuth } from '@/hooks/useAuth';
 import { customerServiceV2 } from '@/services/customerServiceV2';
 import { Eye, EyeOff, LogIn, Mail } from 'lucide-react';
-import { Button } from '@/components/ui';
+import { Button, Input } from '@/components/ui';
 
 type AuthReturn = ReturnType<typeof useAuth>;
 
@@ -138,28 +138,18 @@ export function LoginScreen({ auth }: Props) {
                 <label htmlFor="login-email" className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
                   Email
                 </label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50" aria-hidden="true" />
-                  <input
-                    id="login-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="tu@email.com"
-                    autoComplete="username"
-                    aria-invalid={!!auth.error || undefined}
-                    aria-describedby={auth.error ? 'login-employee-error' : undefined}
-                    className="w-full pl-9 pr-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
-                    style={{
-                      border: '1px solid var(--br-bor)',
-                      background: 'var(--br-sur)',
-                      color: 'var(--br-txt)',
-                    }}
-                    onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-                    onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')}
-                    autoFocus
-                  />
-                </div>
+                <Input
+                  id="login-email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@email.com"
+                  autoComplete="username"
+                  aria-invalid={!!auth.error || undefined}
+                  aria-describedby={auth.error ? 'login-employee-error' : undefined}
+                  iconLeft={<Mail className="h-4 w-4" />}
+                  autoFocus
+                />
               </div>
 
               <div>
@@ -167,7 +157,7 @@ export function LoginScreen({ auth }: Props) {
                   Contraseña
                 </label>
                 <div className="relative">
-                  <input
+                  <Input
                     id="login-password"
                     type={showPwd ? 'text' : 'password'}
                     value={password}
@@ -176,14 +166,7 @@ export function LoginScreen({ auth }: Props) {
                     autoComplete="current-password"
                     aria-invalid={!!auth.error || undefined}
                     aria-describedby={auth.error ? 'login-employee-error' : undefined}
-                    className="w-full pr-10 pl-3 py-2.5 rounded-lg text-sm outline-none transition-colors"
-                    style={{
-                      border: '1px solid var(--br-bor)',
-                      background: 'var(--br-sur)',
-                      color: 'var(--br-txt)',
-                    }}
-                    onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-                    onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')}
+                    className="pr-10"
                   />
                   <button
                     type="button"
@@ -224,19 +207,17 @@ export function LoginScreen({ auth }: Props) {
                   <label htmlFor="login-client-search" className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
                     Buscar cliente
                   </label>
-                  <input
-                    id="login-client-search"
-                    type="text"
-                    value={clientSearch}
-                    onChange={(e) => setClientSearch(e.target.value)}
-                    placeholder="Nombre del cliente..."
-                    aria-label="Buscar cliente por nombre"
-                    className="w-full px-3 py-2.5 rounded-lg text-sm outline-none mb-2"
-                    style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-                    onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-                    onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')}
-                    autoFocus
-                  />
+                  <div className="mb-2">
+                    <Input
+                      id="login-client-search"
+                      type="text"
+                      value={clientSearch}
+                      onChange={(e) => setClientSearch(e.target.value)}
+                      placeholder="Nombre del cliente..."
+                      aria-label="Buscar cliente por nombre"
+                      autoFocus
+                    />
+                  </div>
                   <div className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--br-bor)' }}>
                     {clientsLoading ? (
                       <p className="px-3 py-3 text-sm" style={{ color: 'var(--br-txt2)' }}>Cargando clientes…</p>
@@ -292,7 +273,7 @@ export function LoginScreen({ auth }: Props) {
                       <label htmlFor="login-client-pin" className="block text-xs font-semibold uppercase tracking-wide mb-1.5" style={{ color: 'var(--br-txt2)' }}>
                         PIN
                       </label>
-                      <input
+                      <Input
                         id="login-client-pin"
                         type="password"
                         inputMode="numeric"
@@ -303,10 +284,7 @@ export function LoginScreen({ auth }: Props) {
                         autoComplete="current-password"
                         aria-invalid={!!auth.error || undefined}
                         aria-describedby={auth.error ? 'login-client-error' : undefined}
-                        className="w-full px-3 py-2.5 rounded-lg text-sm outline-none text-center tracking-widest"
-                        style={{ border: '1px solid var(--br-bor)', background: 'var(--br-sur)', color: 'var(--br-txt)' }}
-                        onFocus={(e) => (e.target.style.borderColor = 'var(--br-amb)')}
-                        onBlur={(e) => (e.target.style.borderColor = 'var(--br-bor)')}
+                        className="text-center tracking-widest"
                         autoFocus
                       />
                     </>
