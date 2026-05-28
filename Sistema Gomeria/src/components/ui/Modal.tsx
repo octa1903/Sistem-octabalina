@@ -1,7 +1,16 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useId, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { useStableCallback } from '@/hooks/useStableCallback';
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]:not([disabled])',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
 
 interface ModalProps {
   open: boolean;
@@ -26,28 +35,61 @@ export function Modal({
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const stableOnClose = useStableCallback(onClose);
+  const titleId = useId();
 
   useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && open) stableOnClose();
+    if (!open) return;
+
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    document.body.style.overflow = 'hidden';
+
+    requestAnimationFrame(() => {
+      const focusable = dialogRef.current?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR);
+      focusable?.focus();
+    });
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        stableOnClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusables = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+      if (focusables.length === 0) {
+        e.preventDefault();
+        return;
+      }
+
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+
+      // Si el foco está fuera del dialog (caso patológico), traerlo al primero.
+      if (!active || !dialogRef.current.contains(active)) {
+        e.preventDefault();
+        first.focus();
+        return;
+      }
+
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
-    document.addEventListener('keydown', handleEsc);
-    if (open) {
-      document.body.style.overflow = 'hidden';
-      const previouslyFocused = document.activeElement as HTMLElement | null;
-      requestAnimationFrame(() => {
-        const focusable = dialogRef.current?.querySelector<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-        );
-        focusable?.focus();
-      });
-      return () => {
-        document.removeEventListener('keydown', handleEsc);
-        document.body.style.overflow = '';
-        previouslyFocused?.focus?.();
-      };
-    }
-    return () => document.removeEventListener('keydown', handleEsc);
+
+    document.addEventListener('keydown', handleKey);
+
+    return () => {
+      document.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = '';
+      previouslyFocused?.focus?.();
+    };
   }, [open, stableOnClose]);
 
   if (!open) return null;
@@ -73,7 +115,7 @@ export function Modal({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby={title ? 'modal-title' : undefined}
+        aria-labelledby={title ? titleId : undefined}
         className={cn('w-full animate-in', sizeClasses[size], className)}
         style={{
           background: 'var(--br-sur)',
@@ -87,7 +129,7 @@ export function Modal({
             className="flex items-center justify-between px-6 py-4"
             style={{ borderBottom: '1px solid var(--br-bor)' }}
           >
-            <h2 id="modal-title" className="text-lg font-semibold" style={{ color: 'var(--br-txt)' }}>
+            <h2 id={titleId} className="text-lg font-semibold" style={{ color: 'var(--br-txt)' }}>
               {title}
             </h2>
             <button

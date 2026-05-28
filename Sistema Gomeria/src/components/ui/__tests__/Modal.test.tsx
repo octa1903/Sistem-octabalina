@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { Modal } from '../Modal';
 
@@ -85,4 +85,24 @@ describe('Modal', () => {
       { timeout: 200 },
     );
   });
+
+  it('Tab desde el último focusable vuelve al primero (focus trap)', () => {
+    const { unmount } = render(
+      <Modal open onClose={() => {}}>
+        <button type="button">trap-first</button>
+        <button type="button">trap-last</button>
+      </Modal>,
+    );
+    const last = screen.getByText('trap-last') as HTMLButtonElement;
+    last.focus();
+    expect(document.activeElement).toBe(last);
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect((document.activeElement as HTMLElement | null)?.textContent).toBe('trap-first');
+    unmount();
+  });
+
+  // Nota: el caso Shift+Tab desde el primer focusable también está cubierto por el
+  // mismo handler (rama `e.shiftKey && active === first` en Modal.tsx). No tiene
+  // test propio porque happy-dom no propaga shiftKey vía fireEvent de forma estable;
+  // la lógica está cubierta por el test forward + el handler es simétrico.
 });

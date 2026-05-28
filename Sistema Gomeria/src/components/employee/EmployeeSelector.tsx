@@ -8,6 +8,16 @@ import { useEffect, useRef, useState } from 'react';
 import type { Employee } from '@/types';
 import { employeeService } from '@/services/employeeService';
 import { AlertCircle, LogIn, User } from 'lucide-react';
+import { Button } from '@/components/ui';
+
+const FOCUSABLE_SELECTOR = [
+  'a[href]:not([disabled])',
+  'button:not([disabled])',
+  'input:not([disabled]):not([type="hidden"])',
+  'select:not([disabled])',
+  'textarea:not([disabled])',
+  '[tabindex]:not([tabindex="-1"])',
+].join(',');
 
 interface Props {
   storeId: string;
@@ -24,7 +34,39 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const mountedRef = useRef(true);
   const pinInputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   useEffect(() => () => { mountedRef.current = false; }, []);
+
+  // Focus trap: el operador no debe poder tabular fuera del diálogo.
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+      const focusables = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+      ).filter((el) => !el.hasAttribute('disabled') && el.offsetParent !== null);
+      if (focusables.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      if (!active || !dialogRef.current.contains(active)) {
+        e.preventDefault();
+        first.focus();
+        return;
+      }
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -64,6 +106,7 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
       style={{ background: 'rgba(28, 24, 20, 0.85)' }}
     >
       <div
+        ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby="employee-selector-title"
@@ -161,15 +204,16 @@ export function EmployeeSelector({ storeId, onSelected, loginWithPin }: Props) {
           )}
 
           {selectedId && (
-            <button
+            <Button
               type="submit"
+              variant="primary"
+              fullWidth
               disabled={submitting || !pin}
-              className="w-full py-2.5 rounded-lg text-sm font-semibold text-white flex items-center justify-center gap-2 transition-opacity disabled:opacity-50"
-              style={{ background: 'var(--br-dark)' }}
+              loading={submitting}
+              iconLeft={<LogIn className="h-4 w-4" />}
             >
-              <LogIn className="h-4 w-4" />
-              {submitting ? 'Verificando…' : 'Confirmar'}
-            </button>
+              Confirmar
+            </Button>
           )}
         </form>
       </div>

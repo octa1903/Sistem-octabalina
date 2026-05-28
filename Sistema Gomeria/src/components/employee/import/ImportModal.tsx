@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { Button, Spinner } from '@/components/ui';
+import { Button, FormField, Input, Spinner } from '@/components/ui';
 import { Upload, Download, FileText, AlertTriangle, CheckCircle } from 'lucide-react';
 import {
   parseFile, validateTireRows, validateCustomerRows,
@@ -189,39 +189,33 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
                 Lista de proveedor <span className="font-normal">(opcional — para histórico de costos)</span>
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <label className="block">
-                  <span className="text-xs" style={{ color: 'var(--br-txt2)' }}>Proveedor</span>
-                  <input
+                <FormField label="Proveedor">
+                  <Input
                     type="text"
+                    sizeVariant="sm"
                     value={supplierName}
                     onChange={e => setSupplierName(e.target.value)}
                     placeholder="ej: BULL VIAL"
-                    className="w-full px-2 py-1.5 text-sm rounded"
-                    style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}
                   />
-                </label>
-                <label className="block">
-                  <span className="text-xs" style={{ color: 'var(--br-txt2)' }}>Fecha de la lista</span>
-                  <input
+                </FormField>
+                <FormField label="Fecha de la lista">
+                  <Input
                     type="date"
+                    sizeVariant="sm"
                     value={listDate}
                     onChange={e => setListDate(e.target.value)}
-                    className="w-full px-2 py-1.5 text-sm rounded"
-                    style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}
                   />
-                </label>
+                </FormField>
               </div>
-              <label className="block">
-                <span className="text-xs" style={{ color: 'var(--br-txt2)' }}>Notas</span>
-                <input
+              <FormField label="Notas">
+                <Input
                   type="text"
+                  sizeVariant="sm"
                   value={listNotes}
                   onChange={e => setListNotes(e.target.value)}
                   placeholder="ej: Lista mayo 2026, recibida por mail"
-                  className="w-full px-2 py-1.5 text-sm rounded"
-                  style={{ background: 'var(--br-sur)', border: '1px solid var(--br-bor)', color: 'var(--br-txt)' }}
                 />
-              </label>
+              </FormField>
               <p className="text-xs" style={{ color: 'var(--br-txt2)' }}>
                 Si completás el proveedor, además del catálogo se guarda un snapshot con la fecha
                 para ver la evolución de costos en cada neumático.
