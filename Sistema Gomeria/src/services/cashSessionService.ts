@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { ensureNoError, rowToCamel, camelToRow, stripUndefined } from './supabaseHelpers';
+import { toMoney } from '@/utils/currency';
 import type { CashSession, CashMovement } from '@/types';
 
 const SESSIONS = 'cash_sessions';
@@ -92,11 +93,11 @@ export const cashSessionService = {
     }
     if (!data) throw new Error('close_cash_session: respuesta vacía');
     // Supabase devuelve el jsonb tal cual
-    const r = data as { expected_cash: number; counted_cash: number; variance: number };
+    const r = data as { expected_cash: unknown; counted_cash: unknown; variance: unknown };
     return {
-      expectedCash: Number(r.expected_cash),
-      countedCash: Number(r.counted_cash),
-      variance: Number(r.variance),
+      expectedCash: toMoney(r.expected_cash),
+      countedCash: toMoney(r.counted_cash),
+      variance: toMoney(r.variance),
     };
   },
 

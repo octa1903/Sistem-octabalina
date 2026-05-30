@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { ensureNoError, rowToCamel } from './supabaseHelpers';
+import { toMoney } from '@/utils/currency';
 
 export interface Check {
   id: string;
@@ -79,18 +80,19 @@ export const checkServiceV2 = {
       .select('type, cashed, amount')
       .eq('cashed', false);
     if (error) throw error;
-    const rows = (data ?? []) as Array<{ type: string; cashed: boolean; amount: number }>;
+    const rows = (data ?? []) as Array<{ type: string; cashed: boolean; amount: unknown }>;
     let inC = 0;
     let inA = 0;
     let outC = 0;
     let outA = 0;
     for (const r of rows) {
+      const amt = toMoney(r.amount);
       if (r.type === 'incoming') {
         inC++;
-        inA += Number(r.amount);
+        inA += amt;
       } else {
         outC++;
-        outA += Number(r.amount);
+        outA += amt;
       }
     }
     return {

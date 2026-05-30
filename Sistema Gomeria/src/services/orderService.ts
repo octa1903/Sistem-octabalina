@@ -7,6 +7,7 @@
 
 import { supabase } from './supabaseClient';
 import { ensureNoError, stripUndefined, callUntypedRpc } from './supabaseHelpers';
+import { toMoney } from '@/utils/currency';
 import type { Order, OrderItem, OrderStatus } from '@/types';
 
 const TABLE = 'customer_orders';
@@ -18,7 +19,7 @@ export function toLegacyOrder(row: Record<string, unknown>): Order {
     numero: row.numero as string,
     clientId: (row.customer_id as string | null) ?? '',
     clientName: row.customer_name as string,
-    items: (row.items as OrderItem[]) ?? [],
+    items: Array.isArray(row.items) ? (row.items as OrderItem[]) : [],
     paymentMethod: (row.payment_method_id as string | null) ?? '',
     status: row.status as OrderStatus,
     tipo: row.tipo as 'retiro' | 'entrega_domicilio',
@@ -26,7 +27,7 @@ export function toLegacyOrder(row: Record<string, unknown>): Order {
     scheduledTime: (row.scheduled_time as string | null) ?? undefined,
     address: (row.address as string | null) ?? undefined,
     notes: (row.notes as string | null) ?? undefined,
-    totalAmount: Number(row.total_amount),
+    totalAmount: toMoney(row.total_amount),
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
     confirmedBy: (row.confirmed_by_employee_id as string | null) ?? undefined,

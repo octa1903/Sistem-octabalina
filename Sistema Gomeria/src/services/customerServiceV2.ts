@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { ensureNoError, rowToCamel, camelToRow, stripUndefined } from './supabaseHelpers';
+import { toMoney } from '@/utils/currency';
 import type { Customer, Client, CustomerAccountMovement } from '@/types';
 
 const TABLE = 'customers';
@@ -85,8 +86,10 @@ export const customerServiceV2 = {
     let totalCredit = 0;
     let debtorCount = 0;
     let creditorCount = 0;
-    for (const r of rows as { account_balance: number }[]) {
-      const b = Number(r.account_balance);
+    for (const r of rows as { account_balance: unknown }[]) {
+      // toMoney degrada saldos corruptos (NaN, absurdos de migración) a 0,
+      // así un dato malo no infla el total de deuda/favor del encabezado.
+      const b = toMoney(r.account_balance);
       if (b > 0) {
         totalDebt += b;
         debtorCount += 1;

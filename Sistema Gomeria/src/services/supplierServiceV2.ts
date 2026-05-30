@@ -1,5 +1,6 @@
 import { supabase } from './supabaseClient';
 import { ensureNoError, rowToCamel, fetchAllPaginated } from './supabaseHelpers';
+import { toMoney } from '@/utils/currency';
 
 export interface Supplier {
   id: string;
@@ -70,9 +71,9 @@ export const supplierServiceV2 = {
       .in('supplier_id', ids);
     if (mErr) throw mErr;
     const balanceBySupplier = new Map<string, number>();
-    for (const m of (movs ?? []) as Array<{ supplier_id: string; type: string; amount: number }>) {
+    for (const m of (movs ?? []) as Array<{ supplier_id: string; type: string; amount: unknown }>) {
       const sign = m.type === 'invoice' || m.type === 'adjustment' || m.type === 'opening_balance' ? 1 : -1;
-      balanceBySupplier.set(m.supplier_id, (balanceBySupplier.get(m.supplier_id) ?? 0) + sign * Number(m.amount));
+      balanceBySupplier.set(m.supplier_id, (balanceBySupplier.get(m.supplier_id) ?? 0) + sign * toMoney(m.amount));
     }
     return suppliers.map((s) => ({ ...s, balance: balanceBySupplier.get(s.id) ?? 0 }));
   },
