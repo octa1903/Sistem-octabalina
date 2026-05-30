@@ -5,6 +5,25 @@ import type { TireV2, TireStoreOverride, Tire } from '@/types';
 const TIRES = 'tires';
 const OVERRIDES = 'tire_store_overrides';
 
+/**
+ * Normaliza entradas de carga de stock (pure, testeable):
+ * - suma cantidades repetidas del mismo tire,
+ * - descarta cantidades no enteras, no finitas o <= 0.
+ * Devuelve un Map tireId → cantidad total a sumar.
+ */
+export function normalizeStockEntries(
+  entries: ReadonlyArray<{ tireId: string; quantity: number }>,
+): Map<string, number> {
+  const byTire = new Map<string, number>();
+  for (const e of entries) {
+    if (!e.tireId) continue;
+    const q = Math.floor(Number(e.quantity));
+    if (!Number.isFinite(q) || q <= 0) continue;
+    byTire.set(e.tireId, (byTire.get(e.tireId) ?? 0) + q);
+  }
+  return byTire;
+}
+
 export const tireServiceV2 = {
   // ── Tire raíz ──────────────────────────────────────
 
@@ -111,6 +130,72 @@ export const tireServiceV2 = {
     // así que filtramos en cliente sobre los del store.
     const all = await this.getOverridesByStore(storeId);
     return all.filter(o => o.stock <= o.lowStockThreshold);
+  },
+
+  // ── Carga de stock (suma a overrides por tienda) ──────────────────
+
+  /**
+   * Suma cantidades de stock a varios tires de una tienda en bloque.
+   * Pensado para cargar mercadería (factura de compra / reposición):
+   * cada entrada SUMA al stock actual (no lo reemplaza).
+   *
+   * Si un tire no tiene override en la tienda, se crea uno con el stock
+   * inicial (heredando price/threshold del default del tire si hace falta).
+   *
+   * Defensivo: ignora cantidades no positivas o no enteras. Devuelve el
+   * detalle por tire (stock previo → nuevo) para feedback en la UI.
+   */
+  async addStock(
+    storeId: string,
+    entries: ReadonlyArray<{ tireId: string; quantity: number }>,
+  ): Promise<Array<{ tireId: string; previousStock: number; newStock: number; quantity: number }>> {
+    // Normalizar: sumar cantidades por tire y descartar las inválidas.
+    const byTire = normalizeStockEntries(entries);
+    if (byTire.size === 0) return [];
+
+    // Traer los overrides actuales y los tires (para defaults) de una sola vez.
+    const tireIds = [...byTire.keys()];
+    const [existingOverrides, { data: tireRows, error: tireErr }] = await Promise.all([
+      supabase.from(OVERRIDES).select('*').eq('store_id', storeId).in('tire_id', tireIds),
+      supabase.from(TIRES).select('id, default_price').in('id', tireIds),
+    ]);
+    if (existingOverrides.error) throw existingOverrides.error;
+    if (tireErr) throw tireErr;
+
+    const overrideByTire = new Map<string, TireStoreOverride>();
+    for (const r of existingOverrides.data ?? []) {
+      const o = rowToCamel<TireStoreOverride>(r as Record<string, unknown>);
+      overrideByTire.set(o.tireId, o);
+    }
+    const defaultPriceByTire = new Map<string, number>();
+    for (const r of (tireRows ?? []) as Array<{ id: string; default_price: unknown }>) {
+      defaultPriceByTire.set(r.id, Number(r.default_price) || 0);
+    }
+
+    const result: Array<{ tireId: string; previousStock: number; newStock: number; quantity: number }> = [];
+    const payloads = [];
+    for (const [tireId, quantity] of byTire) {
+      const existing = overrideByTire.get(tireId);
+      const previousStock = Math.max(0, Math.floor(Number(existing?.stock ?? 0)) || 0);
+      const newStock = previousStock + quantity;
+      payloads.push({
+        tire_id: tireId,
+        store_id: storeId,
+        available: existing?.available ?? true,
+        price: existing?.price ?? defaultPriceByTire.get(tireId) ?? 0,
+        stock: newStock,
+        low_stock_threshold: existing?.lowStockThreshold ?? 2,
+        location: existing?.location ?? null,
+      });
+      result.push({ tireId, previousStock, newStock, quantity });
+    }
+
+    // Upsert en bloque (un solo round-trip).
+    const { error } = await supabase
+      .from(OVERRIDES)
+      .upsert(payloads, { onConflict: 'tire_id,store_id' });
+    if (error) throw error;
+    return result;
   },
 
   // ── Ajuste masivo de precios (RPC bulk_adjust_tire_prices) ────────

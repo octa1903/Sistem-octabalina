@@ -8,8 +8,9 @@ import { compareTireSize } from '@/utils/tireSize';
 import { Modal } from '@/components/ui/Modal';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { ImportModal } from '@/components/employee/import/ImportModal';
+import { StockEntryModal } from '@/components/employee/inventory/StockEntryModal';
 import { Button, IconButton, FormField, Input, Select, EmptyState } from '@/components/ui';
-import { Plus, Search, Edit2, Trash2, AlertTriangle, Upload, TrendingUp, Package } from 'lucide-react';
+import { Plus, Search, Edit2, Trash2, AlertTriangle, Upload, TrendingUp, Package, PackagePlus } from 'lucide-react';
 
 interface Props {
   addToast: (msg: string, type?: 'success' | 'error' | 'warning' | 'info') => void;
@@ -55,6 +56,7 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState<Tire | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+  const [stockEntryOpen, setStockEntryOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkForm, setBulkForm] = useState({
     pctDelta: 5,
@@ -168,6 +170,20 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
       addToast('Seleccioná una categoría.', 'error');
       return;
     }
+    // Validación numérica defensiva: ningún campo de dinero/cantidad puede
+    // guardarse NaN ni negativo (rompería balances, márgenes y stock).
+    const numericFields: Array<[label: string, value: number]> = [
+      ['costo', form.cost],
+      ['precio', form.price],
+      ['stock', form.stock],
+      ['stock mínimo', form.lowStockThreshold],
+    ];
+    for (const [label, value] of numericFields) {
+      if (!Number.isFinite(value) || value < 0) {
+        addToast(`El ${label} debe ser un número válido (≥ 0).`, 'error');
+        return;
+      }
+    }
     if (!activeStoreId) {
       addToast('Sin tienda activa.', 'error');
       return;
@@ -226,7 +242,7 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
   const stockBadge = (t: Tire) => {
     if (t.stock === 0) return { label: 'Sin stock', color: 'var(--br-red)', bg: 'var(--br-red-bg)', border: 'var(--br-red-bor)' };
     if (t.stock <= t.minStock) return { label: 'Stock bajo', color: 'var(--br-amb)', bg: 'var(--br-amb-bg)', border: 'var(--br-amb-bor)' };
-    return { label: 'OK', color: 'var(--br-grn)', bg: 'var(--br-grn-bg)', border: 'var(--br-grn-bor)' };
+    return { label: 'En stock', color: 'var(--br-grn)', bg: 'var(--br-grn-bg)', border: 'var(--br-grn-bor)' };
   };
 
   // Auto-recalcular precio cuando cambia cost o margin
@@ -254,6 +270,15 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => setStockEntryOpen(true)}
+            disabled={loading || tires.length === 0}
+            iconLeft={<PackagePlus className="h-4 w-4" />}
+            title="Cargar mercadería: sumar stock por marca (lista o factura)"
+          >
+            Cargar stock
+          </Button>
           <Button
             variant="secondary"
             onClick={() => setImportOpen(true)}
@@ -523,6 +548,22 @@ export function InventoryView({ addToast, activeStoreId }: Props) {
         onClose={() => setImportOpen(false)}
         onComplete={(s) => {
           addToast(`${s.inserted} neumáticos importados${s.failed > 0 ? `, ${s.failed} con errores` : ''}.`, s.failed > 0 ? 'warning' : 'success');
+          void refresh();
+        }}
+      />
+
+      {/* Carga de stock (lista por marca o factura) */}
+      <StockEntryModal
+        open={stockEntryOpen}
+        storeId={activeStoreId}
+        tires={tires}
+        onClose={() => setStockEntryOpen(false)}
+        onSaved={({ tiresAffected, unitsAdded }) => {
+          addToast(
+            `Stock cargado: +${unitsAdded} ${unitsAdded === 1 ? 'unidad' : 'unidades'} en ${tiresAffected} ${tiresAffected === 1 ? 'modelo' : 'modelos'}.`,
+            'success',
+          );
+          setStockEntryOpen(false);
           void refresh();
         }}
       />
