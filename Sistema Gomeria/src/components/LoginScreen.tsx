@@ -68,18 +68,27 @@ export function LoginScreen({ auth }: Props) {
   async function handleEmployee(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    await auth.employeeLogin(email, password);
-    setLoading(false);
-    setPassword('');
+    try {
+      // employeeLogin maneja sus propios errores (setError) y nunca lanza,
+      // pero el try/finally garantiza que el spinner SIEMPRE se libere
+      // incluso si algo inesperado revienta — nunca un botón colgado.
+      await auth.employeeLogin(email, password);
+    } finally {
+      setLoading(false);
+      setPassword('');
+    }
   }
 
   async function handleClient(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedClientId) return;
     setLoading(true);
-    await auth.clientLogin(selectedClientId, pin);
-    setLoading(false);
-    setPin('');
+    try {
+      await auth.clientLogin(selectedClientId, pin);
+    } finally {
+      setLoading(false);
+      setPin('');
+    }
   }
 
   return (

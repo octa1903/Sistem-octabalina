@@ -15,6 +15,8 @@ import {
 } from '@/constants';
 import { supabase } from '@/services/supabaseClient';
 import { callUntypedRpc } from '@/services/supabaseHelpers';
+import { withTimeout, TimeoutError } from '@/utils/withTimeout';
+import { describeError } from '@/utils/errorMessage';
 
 interface AuthState {
   isAuthenticated: boolean;
@@ -30,6 +32,21 @@ interface AuthState {
 }
 
 const INITIAL: AuthState = { isAuthenticated: false, sessionType: null, expiresAt: 0 };
+
+/**
+ * Type guard para la sesión persistida en sessionStorage. Rechaza shapes
+ * inesperadas (versiones viejas, corrupción parcial) para no hidratar la
+ * app con una sesión malformada.
+ */
+function isPersistedAuth(v: unknown): v is AuthState {
+  if (!v || typeof v !== 'object') return false;
+  const o = v as Record<string, unknown>;
+  return (
+    typeof o.isAuthenticated === 'boolean' &&
+    typeof o.expiresAt === 'number' &&
+    (o.sessionType === 'employee' || o.sessionType === 'client' || o.sessionType === null)
+  );
+}
 
 async function loadEmployeeForUser(userId: string) {
   const { data, error } = await supabase
@@ -57,7 +74,10 @@ export function useAuth() {
 
     (async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        // getSession puede colgarse intentando refrescar un token inválido
+        // (AuthApiError "Invalid Refresh Token"). withTimeout evita que el
+        // arranque quede esperando en blanco para siempre.
+        const { data: { session } } = await withTimeout(supabase.auth.getSession());
         if (session?.user) {
           const emp = await loadEmployeeForUser(session.user.id);
           if (mounted && emp) {
@@ -77,7 +97,7 @@ export function useAuth() {
 
         // El token de cliente vive en sessionStorage: muere con la pestaña
         // para reducir blast-radius de XSS y cookies persistentes.
-        const saved = sessionGet<AuthState | null>('auth_session', null);
+        const saved = sessionGet<AuthState | null>('auth_session', null, isPersistedAuth);
         if (saved && saved.sessionType === 'client' && saved.expiresAt > Date.now()) {
           if (mounted) setAuth(saved);
         } else {
@@ -149,12 +169,31 @@ export function useAuth() {
         return false;
       }
 
-      const { data, error: signInErr } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password,
-      });
+      let data: Awaited<ReturnType<typeof supabase.auth.signInWithPassword>>['data'] | null = null;
+      let signInErr: unknown = null;
+      try {
+        // withTimeout: si Supabase no responde (sin red, server caído), no
+        // dejamos el login colgado para siempre — cortamos a los 15s.
+        const res = await withTimeout(
+          supabase.auth.signInWithPassword({
+            email: email.trim().toLowerCase(),
+            password,
+          }),
+        );
+        data = res.data;
+        signInErr = res.error;
+      } catch (e) {
+        // Timeout o fallo de red: mensaje claro, sin contar como intento fallido
+        // de credenciales (no fue culpa del usuario).
+        setError(
+          e instanceof TimeoutError
+            ? e.message
+            : `No se pudo conectar. ${describeError(e)}`,
+        );
+        return false;
+      }
 
-      if (signInErr || !data.user) {
+      if (signInErr || !data?.user) {
         const attempts = loginAttempts + 1;
         setLoginAttempts(attempts);
         if (attempts >= MAX_LOGIN_ATTEMPTS) {
@@ -211,13 +250,19 @@ export function useAuth() {
         }
         let data: CustomerLoginRow | CustomerLoginRow[] | null;
         try {
-          data = await callUntypedRpc<CustomerLoginRow | CustomerLoginRow[] | null>(
-            'customer_login',
-            { p_customer_id: clientId, p_pin: pin },
-            'customer_login',
+          data = await withTimeout(
+            callUntypedRpc<CustomerLoginRow | CustomerLoginRow[] | null>(
+              'customer_login',
+              { p_customer_id: clientId, p_pin: pin },
+              'customer_login',
+            ),
           );
         } catch (e) {
-          setError(e instanceof Error ? e.message : 'Credenciales inválidas.');
+          setError(
+            e instanceof TimeoutError ? e.message
+            : e instanceof Error ? e.message
+            : 'Credenciales inválidas.',
+          );
           return false;
         }
         // El RPC devuelve un set; tomar la primera fila.

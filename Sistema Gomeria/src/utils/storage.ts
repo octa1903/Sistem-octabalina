@@ -10,12 +10,32 @@ const STORAGE_PREFIX = 'balina_';
 
 // ─── localStorage ──────────────────────────────────
 
-export function storageGet<T>(key: string, defaultValue: T): T {
+/**
+ * Lee y deserializa una clave de localStorage.
+ *
+ * Defensivo en dos capas:
+ *   1) JSON inválido (corrupción de sintaxis) → defaultValue.
+ *   2) Forma inesperada → si se pasa `validate` y devuelve false, se
+ *      descarta el dato guardado y se vuelve al default, avisando por
+ *      consola. Esto evita que un snapshot viejo/corrupto con shape
+ *      distinta entre por la puerta de atrás y rompa el consumidor.
+ */
+export function storageGet<T>(
+  key: string,
+  defaultValue: T,
+  validate?: (value: unknown) => value is T,
+): T {
   try {
     const raw = localStorage.getItem(STORAGE_PREFIX + key);
     if (!raw) return defaultValue;
-    return JSON.parse(raw) as T;
-  } catch {
+    const parsed: unknown = JSON.parse(raw);
+    if (validate && !validate(parsed)) {
+      console.warn(`[Storage] clave "${key}" con forma inesperada, usando default.`);
+      return defaultValue;
+    }
+    return parsed as T;
+  } catch (e) {
+    console.warn(`[Storage] clave "${key}" corrupta, usando default:`, e);
     return defaultValue;
   }
 }
@@ -40,12 +60,22 @@ export function storageKeys(): string[] {
 
 // ─── sessionStorage (para datos sensibles) ─────────
 
-export function sessionGet<T>(key: string, defaultValue: T): T {
+export function sessionGet<T>(
+  key: string,
+  defaultValue: T,
+  validate?: (value: unknown) => value is T,
+): T {
   try {
     const raw = sessionStorage.getItem(STORAGE_PREFIX + key);
     if (!raw) return defaultValue;
-    return JSON.parse(raw) as T;
-  } catch {
+    const parsed: unknown = JSON.parse(raw);
+    if (validate && !validate(parsed)) {
+      console.warn(`[Session] clave "${key}" con forma inesperada, usando default.`);
+      return defaultValue;
+    }
+    return parsed as T;
+  } catch (e) {
+    console.warn(`[Session] clave "${key}" corrupta, usando default:`, e);
     return defaultValue;
   }
 }

@@ -20,6 +20,13 @@ interface PersistedSession {
   expiresAt: number;
 }
 
+/** Type guard: descarta sesiones de operador con forma corrupta/vieja. */
+function isPersistedSession(v: unknown): v is PersistedSession {
+  if (!v || typeof v !== 'object') return false;
+  const o = v as Record<string, unknown>;
+  return typeof o.employeeId === 'string' && typeof o.expiresAt === 'number';
+}
+
 interface State {
   employee: EmployeeWithRole | null;
   loading: boolean;
@@ -46,7 +53,7 @@ export function useCurrentEmployee() {
 
   // Hidratar al montar
   useEffect(() => {
-    const saved = storageGet<PersistedSession | null>(STORAGE_KEY, null);
+    const saved = storageGet<PersistedSession | null>(STORAGE_KEY, null, isPersistedSession);
     if (!saved || saved.expiresAt <= Date.now()) {
       storageSet<PersistedSession | null>(STORAGE_KEY, null);
       setState({ employee: null, loading: false, error: null });
