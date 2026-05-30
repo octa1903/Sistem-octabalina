@@ -309,7 +309,7 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
                     <td className="px-3 py-1.5 text-right font-mono">{r.parsed?.price?.toLocaleString('es-AR')}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{r.parsed?.stock}</td>
                     <td className="px-3 py-1.5" style={{ color: r.error ? 'var(--br-red)' : 'var(--br-grn)' }}>
-                      {r.error ?? 'OK'}
+                      {r.error ?? 'Válido'}
                     </td>
                   </tr>
                 )) : customerResults.map(r => (
@@ -320,7 +320,7 @@ export function ImportModal({ open, kind, onClose, onComplete, storeId, categori
                     <td className="px-3 py-1.5">{r.parsed?.customerType === 'wholesale' ? 'Mayorista' : 'Minorista'}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{r.parsed?.creditLimit?.toLocaleString('es-AR')}</td>
                     <td className="px-3 py-1.5" style={{ color: r.error ? 'var(--br-red)' : 'var(--br-grn)' }}>
-                      {r.error ?? 'OK'}
+                      {r.error ?? 'Válido'}
                     </td>
                   </tr>
                 ))}

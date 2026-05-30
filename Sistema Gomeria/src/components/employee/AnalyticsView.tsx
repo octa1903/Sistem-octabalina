@@ -182,7 +182,7 @@ export function AnalyticsView({ storeId }: Props) {
             { header: 'Ventas netas',  value: r => r.netSales },
             { header: 'Impuestos',     value: r => r.taxes },
             { header: 'Total',         value: r => r.total },
-            { header: 'COGS',          value: r => r.cogs },
+            { header: 'Costo',         value: r => r.cogs },
             { header: 'Beneficio',     value: r => r.grossProfit },
             { header: 'Recibos',       value: r => r.receiptCount },
             { header: 'Reembolsos #',  value: r => r.refundCount },
@@ -451,7 +451,7 @@ const ITEM_COLUMNS: CsvColumn<SalesByItem>[] = [
   { header: 'Medida',      value: r => r.tireSize },
   { header: 'Cantidad',    value: r => fmtQty(r.quantity) },
   { header: 'Ventas netas',value: r => fmt(r.netSales) },
-  { header: 'COGS',        value: r => fmt(r.cogs) },
+  { header: 'Costo',       value: r => fmt(r.cogs) },
   { header: 'Beneficio',   value: r => fmt(r.profit) },
 ];
 
@@ -459,7 +459,7 @@ const CATEGORY_COLUMNS: CsvColumn<SalesByCategory>[] = [
   { header: 'Categoría',   value: r => r.categoryName },
   { header: 'Cantidad',    value: r => fmtQty(r.quantity) },
   { header: 'Ventas netas',value: r => fmt(r.netSales) },
-  { header: 'COGS',        value: r => fmt(r.cogs) },
+  { header: 'Costo',       value: r => fmt(r.cogs) },
   { header: 'Beneficio',   value: r => fmt(r.profit) },
 ];
 
