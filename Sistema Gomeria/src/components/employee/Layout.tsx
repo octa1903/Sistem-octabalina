@@ -3,6 +3,7 @@ import type { EmployeeTab, CashSession, Permission } from '@/types';
 import type { useAuth } from '@/hooks/useAuth';
 import { Toast, useToast } from '@/components/ui/Toast';
 import { Spinner } from '@/components/ui/Spinner';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import {
   ShoppingCart, Package, Users, CreditCard,
   FileText, ClipboardList, BarChart2, Settings, LogOut, UserCog,
@@ -233,7 +234,14 @@ export function EmployeeApp({ auth }: Props) {
               </div>
             </div>
           ) : (
-            <>
+            // Boundary por vista: un crash en una pestaña muestra un fallback
+            // recuperable sin tumbar el sidebar ni el resto de la app.
+            // resetKeys={[tab]} ⇒ cambiar de pestaña limpia el error previo.
+            <ErrorBoundary
+              variant="section"
+              label={NAV_ITEMS.find(n => n.id === tab)?.label ?? 'esta sección'}
+              resetKeys={[tab]}
+            >
               {tab === 'pos'       && <POSView       addToast={addToast} storeId={stores.activeStoreId} cashSession={cash.session} employeeId={operatorId} employeeName={operatorName} />}
               {tab === 'inventory' && <InventoryView addToast={addToast} activeStoreId={stores.activeStoreId} />}
               {tab === 'clients'   && <ClientsView   addToast={addToast} />}
@@ -244,7 +252,7 @@ export function EmployeeApp({ auth }: Props) {
               {tab === 'orders'    && <OrdersView    addToast={addToast} storeId={stores.activeStoreId} />}
               {tab === 'analytics' && <AnalyticsView storeId={stores.activeStoreId} />}
               {tab === 'settings'  && <SettingsView  auth={auth} addToast={addToast} activeStoreId={stores.activeStoreId} activeStoreName={stores.activeStore?.name} currentRole={current.employee?.role ?? null} />}
-            </>
+            </ErrorBoundary>
           )}
         </main>
       </div>

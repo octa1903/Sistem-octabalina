@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ClientTab } from '@/types';
 import type { useAuth } from '@/hooks/useAuth';
 import { Toast, useToast } from '@/components/ui/Toast';
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { BookOpen, ClipboardList, Clock, User, LogOut } from 'lucide-react';
 import { CatalogView } from './CatalogView';
 import { MyOrdersView } from './MyOrdersView';
@@ -55,10 +56,16 @@ export function ClientApp({ auth }: Props) {
       </header>
 
       <main className="flex-1 max-w-4xl mx-auto w-full px-4 py-5">
-        {tab === 'catalog' && <CatalogView clientId={auth.clientId!} clientToken={auth.clientToken} addToast={addToast} />}
-        {tab === 'orders'  && <MyOrdersView clientToken={auth.clientToken} />}
-        {tab === 'history' && <HistoryView clientToken={auth.clientToken} />}
-        {tab === 'account' && <AccountView clientToken={auth.clientToken} />}
+        <ErrorBoundary
+          variant="section"
+          label={TABS.find(t => t.id === tab)?.label ?? 'esta sección'}
+          resetKeys={[tab]}
+        >
+          {tab === 'catalog' && <CatalogView clientId={auth.clientId!} clientToken={auth.clientToken} addToast={addToast} />}
+          {tab === 'orders'  && <MyOrdersView clientToken={auth.clientToken} />}
+          {tab === 'history' && <HistoryView clientToken={auth.clientToken} />}
+          {tab === 'account' && <AccountView clientToken={auth.clientToken} />}
+        </ErrorBoundary>
       </main>
 
       {toasts.map((t) => (
