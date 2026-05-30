@@ -80,13 +80,13 @@ export function OrdersView({ addToast, storeId }: Props) {
         clientMessage: clientMessage.trim() || undefined,
       });
       await refresh();
-      setSelected((prev) => {
-        const refreshed = orders.find((o) => o.id === order.id);
-        return refreshed ? { ...refreshed, status: newStatus } : prev;
-      });
+      // Reflejar el nuevo estado en el pedido abierto. NO buscamos en `orders`
+      // (sería el array stale del closure, anterior al refresh): aplicamos el
+      // cambio sobre el pedido actual, que es la fuente que el usuario ve.
+      setSelected((prev) => (prev && prev.id === order.id ? { ...prev, status: newStatus } : prev));
       setInternalNote('');
       setClientMessage('');
-      addToast(`Pedido ${newStatus}.`, 'success');
+      addToast(`Pedido ${STATUS_LABELS[newStatus] ?? newStatus}.`, 'success');
     } catch (e) {
       addToast(e instanceof Error ? e.message : 'Error actualizando pedido.', 'error');
     } finally {
@@ -94,11 +94,15 @@ export function OrdersView({ addToast, storeId }: Props) {
     }
   }
 
+  // Defensivo: un status corrupto en DB (migración / dato manual) no debe
+  // romper el render. Fallback a estilo neutro + el texto crudo del status.
+  const FALLBACK_STATUS_CLASS = 'bg-[var(--br-sur2)] text-[var(--br-txt2)] border-[var(--br-bor)]';
   const badge = (status: OrderStatus) => (
-    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[status]}`}>
-      {STATUS_LABELS[status]}
+    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${STATUS_COLORS[status] ?? FALLBACK_STATUS_CLASS}`}>
+      {STATUS_LABELS[status] ?? status ?? '—'}
     </span>
   );
+  const nextStatuses = (status: OrderStatus): string[] => STATUS_FLOW[status] ?? [];
 
   return (
     <div className="p-4 lg:p-6 max-w-6xl mx-auto">
@@ -226,7 +230,7 @@ export function OrdersView({ addToast, storeId }: Props) {
             )}
 
             {/* Status transitions */}
-            {STATUS_FLOW[selected.status].length > 0 && (
+            {nextStatuses(selected.status).length > 0 && (
               <div>
                 <p className="text-sm font-semibold mb-2" style={{ color: 'var(--br-txt)' }}>Avanzar estado</p>
                 <div className="space-y-2">
@@ -237,11 +241,11 @@ export function OrdersView({ addToast, storeId }: Props) {
                     placeholder="Nota interna (opcional)..."
                   />
                   <div className="flex gap-2 flex-wrap">
-                    {STATUS_FLOW[selected.status].map((next) => (
+                    {nextStatuses(selected.status).map((next) => (
                       <button key={next} onClick={() => advanceStatus(selected, next as OrderStatus)}
                         disabled={saving}
-                        className={`px-4 py-2 rounded-lg text-sm font-semibold border ${STATUS_COLORS[next]} disabled:opacity-50`}>
-                        {saving ? 'Guardando…' : `→ ${STATUS_LABELS[next]}`}
+                        className={`px-4 py-2 rounded-lg text-sm font-semibold border ${STATUS_COLORS[next] ?? FALLBACK_STATUS_CLASS} disabled:opacity-50`}>
+                        {saving ? 'Guardando…' : `→ ${STATUS_LABELS[next] ?? next}`}
                       </button>
                     ))}
                   </div>

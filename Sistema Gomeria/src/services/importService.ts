@@ -8,6 +8,7 @@ import { supabase } from './supabaseClient';
 import { ensureNoError, fetchAllPaginated } from './supabaseHelpers';
 import { hashPin } from '@/utils/hash';
 import { describeError } from '@/utils/errorMessage';
+import { parseAmount } from '@/utils/currency';
 import type { Category } from '@/types';
 
 export type RawRow = Record<string, unknown>;
@@ -77,18 +78,40 @@ function pickField<T = unknown>(row: RawRow, aliases: string[]): T | undefined {
   return undefined;
 }
 
-function asNumber(v: unknown): number {
-  if (typeof v === 'number') return v;
-  if (typeof v === 'string') {
-    const cleaned = v.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
-    const n = parseFloat(cleaned);
-    return isNaN(n) ? 0 : n;
-  }
-  return 0;
+/**
+ * Parsea un número de una celda de CSV. Distingue tres casos:
+ *   - celda ausente / vacía → null (el caller decide el default).
+ *   - celda con número válido (es-AR o canónico) → el número.
+ *   - celda PRESENTE pero no parseable ("12.5O", "abc") → NaN.
+ *
+ * Antes devolvía 0 ante basura, lo que metía costos/precios en $0 sin
+ * avisar. Ahora el caller puede tratar NaN como error de fila visible.
+ */
+function asNumberOrNull(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : NaN;
+  const s = String(v).trim();
+  if (!s) return null;
+  // Reusa el parser de currency (maneja es-AR "1.234,56" y "50.000" miles).
+  return parseAmount(s);
 }
 
 function asString(v: unknown): string {
   return v == null ? '' : String(v).trim();
+}
+
+/**
+ * Dada una lista de [label, valor|null], devuelve un mensaje de error para
+ * el primer valor inválido (NaN = celda basura, o negativo), o null si
+ * todos son válidos o ausentes. null = ausente (legítimo, usa default).
+ */
+function firstInvalidNumber(fields: ReadonlyArray<[string, number | null]>): string | null {
+  for (const [label, value] of fields) {
+    if (value === null) continue; // ausente → default, no es error
+    if (Number.isNaN(value)) return `El ${label} no es un número válido.`;
+    if (value < 0) return `El ${label} no puede ser negativo.`;
+  }
+  return null;
 }
 
 export function validateTireRows(rows: RawRow[], categories: Category[]): TireImportResult[] {
@@ -98,10 +121,10 @@ export function validateTireRows(rows: RawRow[], categories: Category[]): TireIm
     const model = asString(pickField(raw, TIRE_HEADERS_ALIASES.model));
     const size = asString(pickField(raw, TIRE_HEADERS_ALIASES.size));
     const categoryName = asString(pickField(raw, TIRE_HEADERS_ALIASES.categoryName)) || 'Sin categoría';
-    const cost = asNumber(pickField(raw, TIRE_HEADERS_ALIASES.cost));
-    const price = asNumber(pickField(raw, TIRE_HEADERS_ALIASES.price));
-    const stock = asNumber(pickField(raw, TIRE_HEADERS_ALIASES.stock));
-    const lowStockThreshold = asNumber(pickField(raw, TIRE_HEADERS_ALIASES.lowStockThreshold)) || 2;
+    const costRaw = asNumberOrNull(pickField(raw, TIRE_HEADERS_ALIASES.cost));
+    const priceRaw = asNumberOrNull(pickField(raw, TIRE_HEADERS_ALIASES.price));
+    const stockRaw = asNumberOrNull(pickField(raw, TIRE_HEADERS_ALIASES.stock));
+    const thresholdRaw = asNumberOrNull(pickField(raw, TIRE_HEADERS_ALIASES.lowStockThreshold));
     const location = asString(pickField(raw, TIRE_HEADERS_ALIASES.location)) || undefined;
     const sku = asString(pickField(raw, TIRE_HEADERS_ALIASES.sku)) || undefined;
 
@@ -111,6 +134,17 @@ export function validateTireRows(rows: RawRow[], categories: Category[]): TireIm
     if (!catNames.has(normalize(categoryName))) {
       return { rowIndex: i, raw, error: `Categoría "${categoryName}" no existe en el sistema.` };
     }
+    // Un valor PRESENTE pero no numérico es un error de fila visible, no un 0
+    // silencioso. Ausente (null) usa default seguro.
+    const numErr = firstInvalidNumber([
+      ['costo', costRaw], ['precio', priceRaw], ['stock', stockRaw], ['stock mínimo', thresholdRaw],
+    ]);
+    if (numErr) return { rowIndex: i, raw, error: numErr };
+
+    const cost = costRaw ?? 0;
+    const price = priceRaw ?? 0;
+    const stock = stockRaw ?? 0;
+    const lowStockThreshold = thresholdRaw ?? 2;
 
     const parsed: TireImportRow = {
       brand, model, size, categoryName, cost, price, stock, lowStockThreshold, location, sku,
@@ -266,9 +300,17 @@ export function validateCustomerRows(rows: RawRow[]): CustomerImportResult[] {
     const typeRaw = normalize(asString(pickField(raw, CUSTOMER_HEADERS_ALIASES.customerType)));
     const customerType: 'retail' | 'wholesale' =
       typeRaw === 'mayorista' || typeRaw === 'wholesale' ? 'wholesale' : 'retail';
-    const creditLimit = asNumber(pickField(raw, CUSTOMER_HEADERS_ALIASES.creditLimit));
-    const wholesaleDiscount = asNumber(pickField(raw, CUSTOMER_HEADERS_ALIASES.wholesaleDiscount)) || undefined;
+    const creditLimitRaw = asNumberOrNull(pickField(raw, CUSTOMER_HEADERS_ALIASES.creditLimit));
+    const wholesaleDiscountRaw = asNumberOrNull(pickField(raw, CUSTOMER_HEADERS_ALIASES.wholesaleDiscount));
     const pin = asString(pickField(raw, CUSTOMER_HEADERS_ALIASES.pin)) || undefined;
+
+    const numErr = firstInvalidNumber([
+      ['cupo de crédito', creditLimitRaw], ['descuento mayorista', wholesaleDiscountRaw],
+    ]);
+    if (numErr) return { rowIndex: i, raw, error: numErr };
+
+    const creditLimit = creditLimitRaw ?? 0;
+    const wholesaleDiscount = wholesaleDiscountRaw ?? undefined;
 
     return {
       rowIndex: i,

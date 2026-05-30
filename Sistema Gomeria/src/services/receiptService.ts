@@ -200,7 +200,13 @@ export const receiptService = {
     }
     if (!isParked) {
       const paymentsTotal = sum(input.paymentSplits.map(p => p.amount));
-      if (Math.abs(paymentsTotal - Math.abs(total)) > 0.01) {
+      // Tolerancia de medio peso: los montos en ARS se redondean a peso
+      // entero, así que cualquier diferencia < 0.5 es ruido de punto
+      // flotante acumulado (IVA included, recargos por cuotas), no un
+      // descuadre real. Con 0.01 fijo, tickets grandes daban falsos
+      // "Pagos no cuadran" y bloqueaban la venta.
+      const PAYMENT_TOLERANCE = 0.5;
+      if (Math.abs(paymentsTotal - Math.abs(total)) > PAYMENT_TOLERANCE) {
         throw new Error(
           `Pagos no cuadran: pagos=${paymentsTotal.toFixed(2)} total=${Math.abs(total).toFixed(2)}`,
         );

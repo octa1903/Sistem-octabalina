@@ -27,6 +27,43 @@ describe('validateTireRows', () => {
     });
   });
 
+  test('costo presente sin ningún dígito → error de fila (no 0 silencioso)', () => {
+    const rows = [
+      { Marca: 'Pirelli', Modelo: 'P1', Medida: '175 R13', Categoría: 'Auto', Costo: 'N/A', Precio: 60000, Stock: 5 },
+    ];
+    const out = validateTireRows(rows, cats);
+    expect(out[0].parsed).toBeUndefined();
+    expect(out[0].error).toMatch(/costo/i);
+  });
+
+  test('número negativo → error de fila', () => {
+    const rows = [
+      { Marca: 'Pirelli', Modelo: 'P1', Medida: '175 R13', Categoría: 'Auto', Costo: 40000, Precio: 60000, Stock: -3 },
+    ];
+    const out = validateTireRows(rows, cats);
+    expect(out[0].parsed).toBeUndefined();
+    expect(out[0].error).toMatch(/stock/i);
+  });
+
+  test('costo ausente usa default 0 sin marcar error', () => {
+    const rows = [
+      { Marca: 'Pirelli', Modelo: 'P1', Medida: '175 R13', Categoría: 'Auto', Precio: 60000, Stock: 5 },
+    ];
+    const out = validateTireRows(rows, cats);
+    expect(out[0].error).toBeUndefined();
+    expect(out[0].parsed?.cost).toBe(0);
+  });
+
+  test('formato es-AR de miles "50.000" se parsea como 50000', () => {
+    const rows = [
+      { Marca: 'Pirelli', Modelo: 'P1', Medida: '175 R13', Categoría: 'Auto', Costo: '50.000', Precio: '80.000', Stock: 4 },
+    ];
+    const out = validateTireRows(rows, cats);
+    expect(out[0].error).toBeUndefined();
+    expect(out[0].parsed?.cost).toBe(50000);
+    expect(out[0].parsed?.price).toBe(80000);
+  });
+
   test('acepta headers en inglés', () => {
     const rows = [{ brand: 'Bridgestone', model: 'B250', size: '185/65 R14', category: 'Auto', cost: 1, price: 2, stock: 5 }];
     const out = validateTireRows(rows, cats);
