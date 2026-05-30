@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient';
 import { ensureNoError, rowToCamel, camelToRow, stripUndefined } from './supabaseHelpers';
+import { validateRow, validateRows } from './validation';
+import { customerSchema } from './schemas';
 import { toMoney } from '@/utils/currency';
 import type { Customer, Client, CustomerAccountMovement } from '@/types';
 
@@ -17,7 +19,11 @@ export const customerServiceV2 = {
       .select('*')
       .is('deleted_at', null)
       .order('name', { ascending: true });
-    return ensureNoError(data, error, 'customerServiceV2.getAll').map(r => rowToCamel<Customer>(r));
+    return validateRows<Customer>(
+      customerSchema,
+      ensureNoError(data, error, 'customerServiceV2.getAll').map(r => rowToCamel(r)),
+      'customerServiceV2.getAll',
+    );
   },
 
   /**
@@ -41,8 +47,10 @@ export const customerServiceV2 = {
     const { data, error } = await q
       .order('account_balance', { ascending: sign === 'credit' })
       .limit(limit);
-    return ensureNoError(data, error, 'customerServiceV2.getWithBalance').map(r =>
-      rowToCamel<Customer>(r),
+    return validateRows<Customer>(
+      customerSchema,
+      ensureNoError(data, error, 'customerServiceV2.getWithBalance').map(r => rowToCamel(r)),
+      'customerServiceV2.getWithBalance',
     );
   },
 
@@ -61,8 +69,10 @@ export const customerServiceV2 = {
       .or(`name.ilike.%${safe}%,phone.ilike.%${safe}%`)
       .order('name', { ascending: true })
       .limit(limit);
-    return ensureNoError(data, error, 'customerServiceV2.search').map(r =>
-      rowToCamel<Customer>(r),
+    return validateRows<Customer>(
+      customerSchema,
+      ensureNoError(data, error, 'customerServiceV2.search').map(r => rowToCamel(r)),
+      'customerServiceV2.search',
     );
   },
 
@@ -107,8 +117,10 @@ export const customerServiceV2 = {
       .from(TABLE)
       .select('*')
       .order('name', { ascending: true });
-    return ensureNoError(data, error, 'customerServiceV2.getAllIncludingDeleted').map(r =>
-      rowToCamel<Customer>(r),
+    return validateRows<Customer>(
+      customerSchema,
+      ensureNoError(data, error, 'customerServiceV2.getAllIncludingDeleted').map(r => rowToCamel(r)),
+      'customerServiceV2.getAllIncludingDeleted',
     );
   },
 
@@ -137,7 +149,7 @@ export const customerServiceV2 = {
       .eq('id', id)
       .maybeSingle();
     if (error) throw error;
-    return data ? rowToCamel<Customer>(data) : undefined;
+    return data ? validateRow<Customer>(customerSchema, rowToCamel(data), 'customerServiceV2.getById') : undefined;
   },
 
   async getWholesale(): Promise<Customer[]> {
@@ -147,8 +159,10 @@ export const customerServiceV2 = {
       .eq('customer_type', 'wholesale')
       .is('deleted_at', null)
       .order('name', { ascending: true });
-    return ensureNoError(data, error, 'customerServiceV2.getWholesale').map(r =>
-      rowToCamel<Customer>(r),
+    return validateRows<Customer>(
+      customerSchema,
+      ensureNoError(data, error, 'customerServiceV2.getWholesale').map(r => rowToCamel(r)),
+      'customerServiceV2.getWholesale',
     );
   },
 

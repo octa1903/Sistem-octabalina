@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient';
 import { ensureNoError, rowToCamel, camelToRow, stripUndefined } from './supabaseHelpers';
+import { validateRow, validateRows } from './validation';
+import { cashSessionSchema } from './schemas';
 import { toMoney } from '@/utils/currency';
 import type { CashSession, CashMovement } from '@/types';
 
@@ -19,7 +21,9 @@ export const cashSessionService = {
       .eq('status', 'open')
       .maybeSingle();
     if (error) throw error;
-    return data ? rowToCamel<CashSession>(data) : undefined;
+    return data
+      ? validateRow<CashSession>(cashSessionSchema, rowToCamel(data), 'cashSessionService.getOpenForStore')
+      : undefined;
   },
 
   async getById(id: string): Promise<CashSession | undefined> {
@@ -29,7 +33,9 @@ export const cashSessionService = {
       .eq('id', id)
       .maybeSingle();
     if (error) throw error;
-    return data ? rowToCamel<CashSession>(data) : undefined;
+    return data
+      ? validateRow<CashSession>(cashSessionSchema, rowToCamel(data), 'cashSessionService.getById')
+      : undefined;
   },
 
   async getByStoreAndDate(storeId: string, dayIso: string): Promise<CashSession[]> {
@@ -43,8 +49,10 @@ export const cashSessionService = {
       .gte('opened_at', start)
       .lte('opened_at', end)
       .order('opened_at', { ascending: false });
-    return ensureNoError(data, error, 'cashSessionService.getByStoreAndDate').map(r =>
-      rowToCamel<CashSession>(r),
+    return validateRows<CashSession>(
+      cashSessionSchema,
+      ensureNoError(data, error, 'cashSessionService.getByStoreAndDate').map(r => rowToCamel(r)),
+      'cashSessionService.getByStoreAndDate',
     );
   },
 

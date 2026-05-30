@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient';
 import { ensureNoError, rowToCamel } from './supabaseHelpers';
+import { validateRow, validateRows } from './validation';
+import { receiptSchema } from './schemas';
 import type {
   Receipt,
   ReceiptLine,
@@ -52,7 +54,7 @@ export const receiptService = {
       .eq('id', id)
       .maybeSingle();
     if (error) throw error;
-    return data ? rowToCamel<Receipt>(data) : undefined;
+    return data ? validateRow<Receipt>(receiptSchema, rowToCamel(data), 'receiptService.getById') : undefined;
   },
 
   async getLines(receiptId: string): Promise<ReceiptLine[]> {
@@ -99,7 +101,11 @@ export const receiptService = {
       .order('created_at', { ascending: false });
     if (opts.limit) q = q.limit(opts.limit);
     const { data, error } = await q;
-    return ensureNoError(data, error, 'receiptService.getByCustomer').map(r => rowToCamel<Receipt>(r));
+    return validateRows<Receipt>(
+      receiptSchema,
+      ensureNoError(data, error, 'receiptService.getByCustomer').map(r => rowToCamel(r)),
+      'receiptService.getByCustomer',
+    );
   },
 
   async getByStore(
@@ -112,7 +118,11 @@ export const receiptService = {
     q = q.order('created_at', { ascending: false });
     if (opts.limit) q = q.limit(opts.limit);
     const { data, error } = await q;
-    return ensureNoError(data, error, 'receiptService.getByStore').map(r => rowToCamel<Receipt>(r));
+    return validateRows<Receipt>(
+      receiptSchema,
+      ensureNoError(data, error, 'receiptService.getByStore').map(r => rowToCamel(r)),
+      'receiptService.getByStore',
+    );
   },
 
   async getBySession(sessionId: string): Promise<Receipt[]> {
@@ -121,7 +131,11 @@ export const receiptService = {
       .select('*')
       .eq('cash_session_id', sessionId)
       .order('created_at', { ascending: false });
-    return ensureNoError(data, error, 'receiptService.getBySession').map(r => rowToCamel<Receipt>(r));
+    return validateRows<Receipt>(
+      receiptSchema,
+      ensureNoError(data, error, 'receiptService.getBySession').map(r => rowToCamel(r)),
+      'receiptService.getBySession',
+    );
   },
 
   async getParked(storeId: string): Promise<Receipt[]> {
@@ -131,7 +145,11 @@ export const receiptService = {
       .eq('store_id', storeId)
       .eq('status', 'parked')
       .order('created_at', { ascending: false });
-    return ensureNoError(data, error, 'receiptService.getParked').map(r => rowToCamel<Receipt>(r));
+    return validateRows<Receipt>(
+      receiptSchema,
+      ensureNoError(data, error, 'receiptService.getParked').map(r => rowToCamel(r)),
+      'receiptService.getParked',
+    );
   },
 
   /** Borra un ticket abierto (solo si status='parked', enforced por RLS). */

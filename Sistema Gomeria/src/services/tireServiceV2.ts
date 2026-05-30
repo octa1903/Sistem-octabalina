@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient';
 import { ensureNoError, rowToCamel, camelToRow, stripUndefined, callUntypedRpc, fetchAllPaginated } from './supabaseHelpers';
+import { validateRow, validateRows } from './validation';
+import { tireSchema, tireOverrideSchema } from './schemas';
 import type { TireV2, TireStoreOverride, Tire } from '@/types';
 
 const TIRES = 'tires';
@@ -33,7 +35,7 @@ export const tireServiceV2 = {
       () => supabase.from(TIRES).select('*').order('brand', { ascending: true }),
       'tireServiceV2.getAll',
     );
-    return rows.map(r => rowToCamel<TireV2>(r));
+    return validateRows<TireV2>(tireSchema, rows.map(r => rowToCamel(r)), 'tireServiceV2.getAll');
   },
 
   async getById(id: string): Promise<TireV2 | undefined> {
@@ -43,7 +45,7 @@ export const tireServiceV2 = {
       .eq('id', id)
       .maybeSingle();
     if (error) throw error;
-    return data ? rowToCamel<TireV2>(data) : undefined;
+    return data ? validateRow<TireV2>(tireSchema, rowToCamel(data), 'tireServiceV2.getById') : undefined;
   },
 
   async save(tire: Partial<TireV2> & { brand: string; model: string; size: string; categoryId: string }): Promise<TireV2> {
@@ -82,7 +84,9 @@ export const tireServiceV2 = {
       .eq('store_id', storeId)
       .maybeSingle();
     if (error) throw error;
-    return data ? rowToCamel<TireStoreOverride>(data) : undefined;
+    return data
+      ? validateRow<TireStoreOverride>(tireOverrideSchema, rowToCamel(data), 'tireServiceV2.getOverride')
+      : undefined;
   },
 
   async getOverridesByStore(storeId: string): Promise<TireStoreOverride[]> {
@@ -91,7 +95,11 @@ export const tireServiceV2 = {
       () => supabase.from(OVERRIDES).select('*').eq('store_id', storeId),
       'tireServiceV2.getOverridesByStore',
     );
-    return rows.map(r => rowToCamel<TireStoreOverride>(r));
+    return validateRows<TireStoreOverride>(
+      tireOverrideSchema,
+      rows.map(r => rowToCamel(r)),
+      'tireServiceV2.getOverridesByStore',
+    );
   },
 
   async getOverridesByTire(tireId: string): Promise<TireStoreOverride[]> {
@@ -99,8 +107,10 @@ export const tireServiceV2 = {
       .from(OVERRIDES)
       .select('*')
       .eq('tire_id', tireId);
-    return ensureNoError(data, error, 'tireServiceV2.getOverridesByTire').map(r =>
-      rowToCamel<TireStoreOverride>(r),
+    return validateRows<TireStoreOverride>(
+      tireOverrideSchema,
+      ensureNoError(data, error, 'tireServiceV2.getOverridesByTire').map(r => rowToCamel(r)),
+      'tireServiceV2.getOverridesByTire',
     );
   },
 
